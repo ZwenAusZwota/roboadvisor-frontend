@@ -1,24 +1,40 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import LoginModal from './LoginModal'
 import './Header.css'
 
 const Header = () => {
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+
   return (
-    <header className="header">
-      <div className="header-container">
-        <div className="header-brand">
-          <h1 className="logo">RoboAdvisor</h1>
-          <p className="tagline">Ihr smarter Partner für digitale Finanzberatung</p>
+    <>
+      <header className="header">
+        <div className="header-container">
+          <div className="header-brand">
+            <h1 className="logo">RoboAdvisor</h1>
+            <p className="tagline">Ihr smarter Partner für digitale Finanzberatung</p>
+          </div>
+          <nav className="nav">
+            <ul className="nav-list">
+              <li><Link to="/" className="nav-link">Home</Link></li>
+              <li><Link to="/contact" className="nav-link">Kontakt</Link></li>
+              <li>
+                <button 
+                  className="nav-link login-button" 
+                  onClick={() => setIsLoginModalOpen(true)}
+                >
+                  Login
+                </button>
+              </li>
+            </ul>
+          </nav>
         </div>
-        <nav className="nav">
-          <ul className="nav-list">
-            <li><Link to="/" className="nav-link">Home</Link></li>
-            <li><Link to="/contact" className="nav-link">Kontakt</Link></li>
-            <li><a href="#" className="nav-link">Login</a></li>
-          </ul>
-        </nav>
-      </div>
-    </header>
+      </header>
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)} 
+      />
+    </>
   )
 }
 

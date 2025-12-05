@@ -1,0 +1,5 @@
+# Ensure backend files are tracked
+backend/*.py text eol=lf
+backend/*.txt text eol=lf
+backend/*.md text eol=lf
+
