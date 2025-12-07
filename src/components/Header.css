@@ -16,6 +16,12 @@
   gap: 2rem;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .header-brand {
   flex: 1;
   min-width: 250px;

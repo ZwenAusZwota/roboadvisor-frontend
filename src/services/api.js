@@ -49,10 +49,19 @@ class ApiService {
 
     try {
       const response = await fetch(url, config)
-      const data = await response.json()
+      
+      // Für Health-Check auch bei nicht-OK Status versuchen, JSON zu parsen
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        // Wenn kein JSON, dann Text-Response
+        const text = await response.text()
+        throw new Error(`Server returned: ${response.status} ${response.statusText}. ${text.substring(0, 100)}`)
+      }
 
       if (!response.ok) {
-        throw new Error(data.detail || 'An error occurred')
+        throw new Error(data.detail || data.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       return data

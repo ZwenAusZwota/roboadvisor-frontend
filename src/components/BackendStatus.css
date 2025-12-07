@@ -1,0 +1,131 @@
+.backend-status-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 0.5rem;
+}
+
+.backend-status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.backend-status-dot.healthy {
+  background-color: #10b981;
+  animation: pulse-green 2s infinite;
+}
+
+.backend-status-dot.unhealthy {
+  background-color: #ef4444;
+  animation: pulse-red 2s infinite;
+}
+
+.backend-status-dot.loading {
+  background-color: #6b7280;
+  width: 14px;
+  height: 14px;
+}
+
+.status-spinner {
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0);
+  }
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0);
+  }
+}
+
+.backend-status-tooltip {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  z-index: 1000;
+  min-width: 250px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: fadeIn 0.2s ease;
+}
+
+.backend-status-tooltip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  right: 1rem;
+  border: 6px solid transparent;
+  border-bottom-color: rgba(0, 0, 0, 0.9);
+}
+
+.backend-status-tooltip pre {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.5;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Mobile Anpassungen */
+@media (max-width: 768px) {
+  .backend-status-container {
+    margin-left: 0.5rem;
+  }
+  
+  .backend-status-tooltip {
+    right: auto;
+    left: 0;
+    min-width: 200px;
+  }
+  
+  .backend-status-tooltip::before {
+    right: auto;
+    left: 1rem;
+  }
+}
+
