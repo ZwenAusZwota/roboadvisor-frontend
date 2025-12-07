@@ -52,9 +52,40 @@ def get_db():
 def init_db():
     """Erstellt alle Tabellen in der Datenbank"""
     from models import User, RiskProfile, Security, TelegramUser
+    from sqlalchemy import inspect
+    
     try:
+        # Prüfe, ob Tabellen bereits existieren
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        
+        # Wenn users-Tabelle existiert, nehmen wir an, dass alle Tabellen existieren
+        if 'users' in existing_tables:
+            print("Database tables already exist, skipping creation.")
+            return
+        
+        # Versuche Tabellen zu erstellen
         Base.metadata.create_all(bind=engine)
+        print("Database tables created successfully!")
     except Exception as e:
-        print(f"Error creating database tables: {e}")
-        raise
+        error_msg = str(e)
+        # Bei PostgreSQL-Berechtigungsfehlern: Warnung statt Fehler
+        if "permission denied" in error_msg.lower() or "insufficientprivilege" in error_msg.lower():
+            print(f"Warning: Cannot create tables due to insufficient permissions: {e}")
+            print("Please create tables manually or grant CREATE privileges to the database user.")
+            print("See DATABASE_SETUP.md for instructions.")
+            # Prüfe, ob Tabellen trotzdem existieren
+            try:
+                inspector = inspect(engine)
+                existing_tables = inspector.get_table_names()
+                if 'users' in existing_tables:
+                    print("Tables already exist, application can continue.")
+                    return
+            except:
+                pass
+            # Wir werfen den Fehler nicht, damit die App trotzdem starten kann
+            # wenn die Tabellen bereits existieren
+        else:
+            print(f"Error creating database tables: {e}")
+            raise
 

@@ -33,14 +33,39 @@ Wenn du ein Database Tag hinterlegt hast:
 
 ### 4. Tabellen erstellen
 
-Die Tabellen werden automatisch beim ersten Start der App erstellt (siehe `startup_event` in `main.py`).
+**WICHTIG**: Bei DigitalOcean Managed PostgreSQL-Datenbanken hat der Standard-Benutzer oft keine Berechtigung, Tabellen zu erstellen. Du musst die Tabellen manuell erstellen.
 
-Falls du die Tabellen manuell erstellen möchtest:
+#### Option 1: Über DigitalOcean Console (Empfohlen)
+
+1. Gehe zu deiner Datenbank im **DigitalOcean Dashboard**
+2. Klicke auf **"Console"** oder **"Query"**
+3. Kopiere den Inhalt von `backend/create_tables.sql`
+4. Führe das SQL-Script in der Console aus
+
+#### Option 2: Über psql (Command Line)
+
+```bash
+# Verbinde dich mit der Datenbank
+psql "postgresql://user:password@host:port/database?sslmode=require"
+
+# Führe das SQL-Script aus
+\i backend/create_tables.sql
+```
+
+Oder direkt:
+
+```bash
+psql "postgresql://user:password@host:port/database?sslmode=require" -f backend/create_tables.sql
+```
+
+#### Option 3: Über Python Script (wenn Berechtigungen vorhanden)
 
 ```bash
 cd backend
 python init_db.py
 ```
+
+**Hinweis**: Die App startet auch ohne Tabellen, aber API-Endpoints werden fehlschlagen, bis die Tabellen existieren.
 
 ## Datenbankstruktur
 
@@ -101,11 +126,28 @@ DATABASE_URL=mysql+pymysql://user:password@localhost:3306/roboadvisor?charset=ut
 - Stelle sicher, dass die Datenbank-Firewall-Regeln die App-IP erlauben
 - Prüfe die Logs: `backend/main.py` loggt Datenbankfehler
 
-### Tabellen werden nicht erstellt
+### Tabellen werden nicht erstellt (Permission Denied)
 
-- Prüfe die Logs beim App-Start
-- Führe `python init_db.py` manuell aus
-- Prüfe, ob der Datenbank-User die nötigen Rechte hat
+**Problem**: `permission denied for schema public`
+
+**Lösung**: Bei DigitalOcean Managed PostgreSQL-Datenbanken hat der Standard-Benutzer keine CREATE-Berechtigung. Du musst die Tabellen manuell erstellen:
+
+1. **Über DigitalOcean Console** (einfachste Methode):
+   - Gehe zu deiner Datenbank → **Console**
+   - Kopiere den Inhalt von `backend/create_tables.sql`
+   - Führe das Script aus
+
+2. **Über psql**:
+   ```bash
+   psql "postgresql://user:password@host:port/database?sslmode=require" -f backend/create_tables.sql
+   ```
+
+3. **Berechtigungen prüfen**:
+   - Die App prüft beim Start, ob Tabellen existieren
+   - Wenn Tabellen existieren, startet die App normal
+   - Wenn nicht, siehst du eine Warnung in den Logs
+
+**Nach dem Erstellen der Tabellen**: Die App funktioniert normal, auch wenn beim Start eine Warnung erscheint.
 
 ### Migrationen
 

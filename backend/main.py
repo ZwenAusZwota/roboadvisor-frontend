@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Database imports
-from database import get_db, init_db
+from database import get_db, init_db, engine
 from models import User
 
 # Konfiguration
@@ -120,7 +120,15 @@ async def startup_event():
     try:
         logger.info("Starting up application...")
         init_db()
-        logger.info("Database initialized successfully")
+        # Prüfe, ob Tabellen existieren
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        if 'users' in existing_tables:
+            logger.info("Database tables exist, application ready.")
+        else:
+            logger.warning("Database tables do not exist. Please create them manually using create_tables.sql")
+            logger.warning("See DATABASE_SETUP.md for instructions.")
     except Exception as e:
         logger.warning(f"Could not initialize database: {e}")
         logger.warning("Database tables may already exist or connection failed.")
