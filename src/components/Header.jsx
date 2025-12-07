@@ -16,7 +16,6 @@ const Header = () => {
             <p className="tagline">Ihr smarter Partner für digitale Finanzberatung</p>
           </div>
           <div className="header-right">
-            <BackendStatus />
             <nav className="nav">
               <ul className="nav-list">
                 <li><Link to="/" className="nav-link">Home</Link></li>
@@ -31,6 +30,7 @@ const Header = () => {
                 </li>
               </ul>
             </nav>
+            <BackendStatus />
           </div>
         </div>
       </header>
