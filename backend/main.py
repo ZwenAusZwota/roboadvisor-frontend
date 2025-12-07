@@ -6,7 +6,13 @@ from typing import Optional
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 import os
+
+# Database imports
+from database import get_db, init_db
+from models import User
 
 # Konfiguration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
@@ -28,19 +34,17 @@ app.add_middleware(
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-# In-Memory Datenbank (in Produktion durch echte DB ersetzen)
-fake_users_db = {}
-
 # Pydantic Models
 class UserCreate(BaseModel):
-    name: str
     email: EmailStr
     password: str
 
 class UserResponse(BaseModel):
-    id: str
-    name: str
+    id: int
     email: str
+    
+    class Config:
+        from_attributes = True
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -70,10 +74,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def get_user(email: str):
-    return fake_users_db.get(email)
+def get_user_by_email(db: Session, email: str):
+    return db.query(User).filter(User.email == email).first()
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -87,10 +94,19 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         token_data = TokenData(email=email)
     except JWTError:
         raise credentials_exception
-    user = get_user(email=token_data.email)
+    user = get_user_by_email(db, email=token_data.email)
     if user is None:
         raise credentials_exception
     return user
+
+# Startup Event: Erstelle Tabellen beim Start
+@app.on_event("startup")
+async def startup_event():
+    try:
+        init_db()
+    except Exception as e:
+        print(f"Warning: Could not initialize database: {e}")
+        print("Database tables may already exist or connection failed.")
 
 # Routes
 @app.get("/")
@@ -98,44 +114,61 @@ async def root():
     return {"message": "RoboAdvisor API", "status": "running"}
 
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+async def health_check(db: Session = Depends(get_db)):
+    try:
+        # Test database connection
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @app.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user: UserCreate):
+async def register(user: UserCreate, db: Session = Depends(get_db)):
     # Prüfe ob User bereits existiert
-    if user.email in fake_users_db:
+    db_user = get_user_by_email(db, email=user.email)
+    if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
     
     # Erstelle neuen User
-    user_id = str(len(fake_users_db) + 1)
     hashed_password = get_password_hash(user.password)
-    fake_users_db[user.email] = {
-        "id": user_id,
-        "name": user.name,
-        "email": user.email,
-        "hashed_password": hashed_password
-    }
+    db_user = User(
+        email=user.email,
+        password=hashed_password
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
     
     return UserResponse(
-        id=user_id,
-        name=user.name,
-        email=user.email
+        id=db_user.id,
+        email=db_user.email
     )
 
 @app.post("/auth/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = get_user(form_data.username)  # username ist hier die email
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = get_user_by_email(db, email=form_data.username)  # username ist hier die email
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not verify_password(form_data.password, user["hashed_password"]):
+    if not verify_password(form_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -143,38 +176,39 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user["email"]}, expires_delta=access_token_expires
+        data={"sub": user.email}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/auth/login-json", response_model=Token)
-async def login_json(user_login: UserLogin):
-    user = get_user(user_login.email)
+async def login_json(
+    user_login: UserLogin,
+    db: Session = Depends(get_db)
+):
+    user = get_user_by_email(db, email=user_login.email)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
-    if not verify_password(user_login.password, user["hashed_password"]):
+    if not verify_password(user_login.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user["email"]}, expires_delta=access_token_expires
+        data={"sub": user.email}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/auth/me", response_model=UserResponse)
-async def read_users_me(current_user: dict = Depends(get_current_user)):
+async def read_users_me(current_user: User = Depends(get_current_user)):
     return UserResponse(
-        id=current_user["id"],
-        name=current_user["name"],
-        email=current_user["email"]
+        id=current_user.id,
+        email=current_user.email
     )
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
