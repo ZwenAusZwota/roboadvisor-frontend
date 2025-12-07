@@ -10,6 +10,7 @@ const Header = () => {
   const [user, setUser] = useState(null)
   const [isHovered, setIsHovered] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [hoverTimeout, setHoverTimeout] = useState(null)
   const navigate = useNavigate()
 
   // Prüfe Login-Status beim Laden
@@ -60,6 +61,15 @@ const Header = () => {
     }
   }, [user])
 
+  // Cleanup für Timeout beim Unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeout) {
+        clearTimeout(hoverTimeout)
+      }
+    }
+  }, [hoverTimeout])
+
   const handleLogout = () => {
     api.logout()
     setUser(null)
@@ -93,14 +103,44 @@ const Header = () => {
                   ) : user ? (
                     <div 
                       className="user-menu-container"
-                      onMouseEnter={() => setIsHovered(true)}
-                      onMouseLeave={() => setIsHovered(false)}
+                      onMouseEnter={() => {
+                        // Lösche Timeout, falls vorhanden
+                        if (hoverTimeout) {
+                          clearTimeout(hoverTimeout)
+                          setHoverTimeout(null)
+                        }
+                        setIsHovered(true)
+                      }}
+                      onMouseLeave={() => {
+                        // Kleiner Delay bevor Menü geschlossen wird
+                        const timeout = setTimeout(() => {
+                          setIsHovered(false)
+                        }, 200) // 200ms Delay
+                        setHoverTimeout(timeout)
+                      }}
                     >
                       <button className="nav-link user-name-button">
                         {user.name || user.email}
                       </button>
                       {isHovered && (
-                        <div className="user-menu-dropdown">
+                        <div 
+                          className="user-menu-dropdown"
+                          onMouseEnter={() => {
+                            // Lösche Timeout, falls vorhanden
+                            if (hoverTimeout) {
+                              clearTimeout(hoverTimeout)
+                              setHoverTimeout(null)
+                            }
+                            setIsHovered(true)
+                          }}
+                          onMouseLeave={() => {
+                            // Kleiner Delay bevor Menü geschlossen wird
+                            const timeout = setTimeout(() => {
+                              setIsHovered(false)
+                            }, 200) // 200ms Delay
+                            setHoverTimeout(timeout)
+                          }}
+                        >
                           <button 
                             className="user-menu-item"
                             onClick={handleProfileClick}

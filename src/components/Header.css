@@ -109,9 +109,8 @@
 
 .user-menu-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% - 0.25rem);
   right: 0;
-  margin-top: 0.5rem;
   background: white;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
@@ -119,6 +118,21 @@
   z-index: 1000;
   overflow: hidden;
   animation: fadeInDown 0.2s ease;
+  /* Unsichtbarer Verbindungsbereich oben - verhindert, dass Menü verschwindet */
+  padding-top: 0.5rem;
+  margin-top: -0.5rem;
+}
+
+/* Unsichtbarer Verbindungsbereich zwischen Button und Dropdown */
+.user-menu-dropdown::before {
+  content: '';
+  position: absolute;
+  top: -0.5rem;
+  left: 0;
+  right: 0;
+  height: 0.5rem;
+  background: transparent;
+  pointer-events: auto;
 }
 
 @keyframes fadeInDown {
