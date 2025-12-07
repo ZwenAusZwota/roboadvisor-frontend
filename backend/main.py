@@ -32,7 +32,7 @@ app.add_middleware(
 
 # Passwort-Hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 # Pydantic Models
 class UserCreate(BaseModel):
@@ -110,8 +110,8 @@ async def startup_event():
         print(f"Warning: Could not initialize database: {e}")
         print("Database tables may already exist or connection failed.")
 
-# API Router (ohne Prefix, da DigitalOcean den /api Prefix entfernt)
-api_router = APIRouter()
+# API Router mit /api Prefix (da DigitalOcean preserve_path_prefix: true verwendet)
+api_router = APIRouter(prefix="/api")
 
 # Routes ohne Prefix (für Health Checks)
 @app.get("/")
@@ -120,6 +120,26 @@ async def root():
 
 @app.get("/health")
 async def health_check(db: Session = Depends(get_db)):
+    """Health check ohne /api prefix"""
+    try:
+        # Test database connection
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@api_router.get("/health")
+async def health_check_api(db: Session = Depends(get_db)):
+    """Health check mit /api prefix"""
     try:
         # Test database connection
         db.execute(text("SELECT 1"))
