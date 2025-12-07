@@ -23,6 +23,20 @@ services:
         type: SECRET
         scope: RUN_TIME
 
+ingress:
+  rules:
+    - match:
+        path:
+          prefix: /api
+      component:
+        name: api
+        preserve_path_prefix: true
+    - match:
+        path:
+          prefix: /
+      component:
+        name: web
+
 static_sites:
   - name: web
     github:
