@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, status, APIRouter
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
@@ -9,6 +10,18 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import os
+import logging
+import traceback
+
+# Logging konfigurieren
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Logs in stdout (wird von DigitalOcean erfasst)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Database imports
 from database import get_db, init_db
@@ -105,10 +118,12 @@ async def get_current_user(
 @app.on_event("startup")
 async def startup_event():
     try:
+        logger.info("Starting up application...")
         init_db()
+        logger.info("Database initialized successfully")
     except Exception as e:
-        print(f"Warning: Could not initialize database: {e}")
-        print("Database tables may already exist or connection failed.")
+        logger.warning(f"Could not initialize database: {e}")
+        logger.warning("Database tables may already exist or connection failed.")
 
 # API Router OHNE Prefix
 # DigitalOcean generiert automatisch: /roboadvisor-frontend-backend
@@ -171,9 +186,11 @@ async def health_check_api(db: Session = Depends(get_db)):
 @api_router.post("/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     try:
+        logger.info(f"Registration attempt for email: {user.email}")
         # Prüfe ob User bereits existiert
         db_user = get_user_by_email(db, email=user.email)
         if db_user:
+            logger.warning(f"Registration failed: Email already registered - {user.email}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
@@ -190,6 +207,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(db_user)
         
+        logger.info(f"User registered successfully: {user.email} (ID: {db_user.id})")
         return UserResponse(
             id=db_user.id,
             name=db_user.name,
@@ -199,6 +217,9 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         db.rollback()
+        error_traceback = traceback.format_exc()
+        logger.error(f"Registration failed for {user.email}: {str(e)}")
+        logger.error(f"Traceback: {error_traceback}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Registration failed: {str(e)}"
@@ -256,6 +277,18 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
         id=current_user.id,
         name=current_user.name,
         email=current_user.email
+    )
+
+# Globaler Exception Handler für unerwartete Fehler
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    error_traceback = traceback.format_exc()
+    logger.error(f"Unhandled exception: {str(exc)}")
+    logger.error(f"Traceback: {error_traceback}")
+    logger.error(f"Request: {request.method} {request.url}")
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": f"Internal server error: {str(exc)}"}
     )
 
 # Router zur App hinzufügen
