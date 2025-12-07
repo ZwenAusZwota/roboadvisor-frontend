@@ -36,11 +36,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # Pydantic Models
 class UserCreate(BaseModel):
+    name: str
     email: EmailStr
     password: str
 
 class UserResponse(BaseModel):
     id: int
+    name: Optional[str]
     email: str
     
     class Config:
@@ -144,6 +146,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     # Erstelle neuen User
     hashed_password = get_password_hash(user.password)
     db_user = User(
+        name=user.name,
         email=user.email,
         password=hashed_password
     )
@@ -153,6 +156,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     
     return UserResponse(
         id=db_user.id,
+        name=db_user.name,
         email=db_user.email
     )
 
@@ -206,6 +210,7 @@ async def login_json(
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return UserResponse(
         id=current_user.id,
+        name=current_user.name,
         email=current_user.email
     )
 
