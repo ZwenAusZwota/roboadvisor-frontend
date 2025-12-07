@@ -43,8 +43,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Passwort-Hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Passwort-Hashing mit Argon2 (moderner und sicherer als bcrypt, kein 72-Byte-Limit)
+# Argon2 ist der Gewinner des Password Hashing Competition 2015
+# Wir unterstützen auch bcrypt für Migration bestehender Passwörter
+pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # Pydantic Models
@@ -74,30 +76,18 @@ class TokenData(BaseModel):
 
 # Hilfsfunktionen
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Verifiziert ein Passwort gegen einen Hash.
+    Unterstützt sowohl Argon2 (neu) als auch bcrypt (für Migration).
+    """
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
     """
-    Hasht ein Passwort mit bcrypt.
-    bcrypt hat ein Limit von 72 Bytes. Längere Passwörter werden abgeschnitten.
+    Hasht ein Passwort mit Argon2.
+    Argon2 hat kein Passwort-Längenlimit wie bcrypt (72 Bytes).
+    Es unterstützt Passwörter beliebiger Länge.
     """
-    # Konvertiere zu Bytes, um die tatsächliche Länge zu prüfen
-    password_bytes = password.encode('utf-8')
-    
-    # Abschneiden auf maximal 72 Bytes (bcrypt Limit)
-    if len(password_bytes) > 72:
-        # Abschneiden auf 72 Bytes
-        password_bytes = password_bytes[:72]
-        # Zurück zu String decodieren (mit Fehlerbehandlung)
-        password = password_bytes.decode('utf-8', errors='replace')
-    
-    # Jetzt sollte das Passwort sicher unter 72 Bytes sein
-    # Aber zur Sicherheit nochmal prüfen
-    final_bytes = password.encode('utf-8')
-    if len(final_bytes) > 72:
-        # Falls es immer noch zu lang ist (sollte nicht passieren), hart abschneiden
-        password = final_bytes[:72].decode('utf-8', errors='replace')
-    
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -217,16 +207,20 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     try:
         logger.info(f"Registration attempt for email: {user.email}")
         
-        # Validierung: Passwort-Länge prüfen (bcrypt Limit: 72 Bytes)
-        # Wichtig: Wir prüfen Bytes, nicht Zeichen (UTF-8 kann mehr Bytes als Zeichen haben)
-        password_bytes = user.password.encode('utf-8')
-        password_byte_length = len(password_bytes)
-        
-        if password_byte_length > 72:
-            logger.warning(f"Registration failed: Password too long ({password_byte_length} bytes) for {user.email}")
+        # Validierung: Passwort-Länge prüfen (sinnvolle Limits)
+        # Argon2 hat kein technisches Limit, aber sehr lange Passwörter sind unpraktisch
+        if len(user.password) < 6:
+            logger.warning(f"Registration failed: Password too short for {user.email}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Passwort ist zu lang. Bitte verwenden Sie maximal 72 Bytes (ca. 50-70 Zeichen)."
+                detail="Passwort muss mindestens 6 Zeichen lang sein."
+            )
+        
+        if len(user.password) > 128:
+            logger.warning(f"Registration failed: Password too long ({len(user.password)} chars) for {user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Passwort ist zu lang. Bitte verwenden Sie maximal 128 Zeichen."
             )
         
         # Prüfe ob User bereits existiert
@@ -239,7 +233,6 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             )
         
         # Erstelle neuen User
-        # get_password_hash() schneidet das Passwort sicher ab, falls nötig
         hashed_password = get_password_hash(user.password)
         db_user = User(
             name=user.name,

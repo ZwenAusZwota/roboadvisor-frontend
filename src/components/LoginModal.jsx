@@ -39,10 +39,9 @@ const LoginModal = ({ isOpen, onClose }) => {
           setLoading(false)
           return
         }
-        // Prüfe Passwort-Länge (bcrypt Limit: 72 Bytes)
-        // Wir prüfen auf 70 Zeichen, um sicherzugehen (UTF-8 kann mehr Bytes sein)
-        if (formData.password.length > 70) {
-          setError('Passwort ist zu lang. Bitte verwenden Sie maximal 70 Zeichen.')
+        // Prüfe Passwort-Länge (maximal 128 Zeichen)
+        if (formData.password.length > 128) {
+          setError('Passwort ist zu lang. Bitte verwenden Sie maximal 128 Zeichen.')
           setLoading(false)
           return
         }
