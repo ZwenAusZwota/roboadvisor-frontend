@@ -1,4 +1,4 @@
-// In Produktion: relative URLs (leer = gleiche Domain)
+// In Produktion: verwende den tatsächlichen Backend-Pfad von DigitalOcean
 // In Entwicklung: localhost:8000
 const getApiBaseUrl = () => {
   // Wenn VITE_API_URL explizit gesetzt ist, verwende das
@@ -11,8 +11,9 @@ const getApiBaseUrl = () => {
     return 'http://localhost:8000'
   }
   
-  // In Produktion: relative URLs (leer = gleiche Domain)
-  return ''
+  // In Produktion: verwende den tatsächlichen Backend-Pfad
+  // DigitalOcean generiert automatisch: /roboadvisor-frontend-backend
+  return '/roboadvisor-frontend-backend'
 }
 
 const API_BASE_URL = getApiBaseUrl()

@@ -32,7 +32,7 @@ app.add_middleware(
 
 # Passwort-Hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # Pydantic Models
 class UserCreate(BaseModel):
@@ -111,8 +111,12 @@ async def startup_event():
         print("Database tables may already exist or connection failed.")
 
 # API Router OHNE Prefix
-# DigitalOcean entfernt den /api Prefix standardmäßig
-# Request: /api/auth/register -> Backend erhält: /auth/register
+# DigitalOcean generiert automatisch: /roboadvisor-frontend-backend
+# Frontend sendet: /roboadvisor-frontend-backend/api/health
+# Backend erhält: /roboadvisor-frontend-backend/api/health
+# Router OHNE Prefix + Route /api/health = /api/health
+# Aber DigitalOcean sendet /roboadvisor-frontend-backend/api/health
+# Lösung: Router OHNE Prefix, Endpoints MIT /api Prefix
 api_router = APIRouter()
 
 # Routes ohne Prefix (für Health Checks)
@@ -139,11 +143,32 @@ async def health_check(db: Session = Depends(get_db)):
             "timestamp": datetime.utcnow().isoformat()
         }
 
-# API Routes (ohne /api Prefix, da DigitalOcean preserve_path_prefix: false verwendet)
-# Frontend sendet: /api/auth/register
-# DigitalOcean entfernt /api → Backend erhält: /auth/register
-# Router hat Route: /auth/register → Funktioniert!
-@api_router.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+# API Routes MIT /api Prefix
+# Frontend sendet: /roboadvisor-frontend-backend/api/auth/register
+# DigitalOcean leitet an Backend weiter: /roboadvisor-frontend-backend/api/auth/register
+# Router OHNE Prefix + Route /api/auth/register = /api/auth/register
+# Aber DigitalOcean sendet /roboadvisor-frontend-backend/api/auth/register
+# Lösung: Endpoints MIT /api Prefix, damit sie mit /roboadvisor-frontend-backend/api/... funktionieren
+@api_router.get("/api/health")
+async def health_check_api(db: Session = Depends(get_db)):
+    """Health check mit /api prefix"""
+    try:
+        # Test database connection
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@api_router.post("/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     # Prüfe ob User bereits existiert
     db_user = get_user_by_email(db, email=user.email)
@@ -170,7 +195,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         email=db_user.email
     )
 
-@api_router.post("/auth/login", response_model=Token)
+@api_router.post("/api/auth/login", response_model=Token)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
@@ -194,7 +219,7 @@ async def login(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@api_router.post("/auth/login-json", response_model=Token)
+@api_router.post("/api/auth/login-json", response_model=Token)
 async def login_json(
     user_login: UserLogin,
     db: Session = Depends(get_db)
@@ -216,7 +241,7 @@ async def login_json(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@api_router.get("/auth/me", response_model=UserResponse)
+@api_router.get("/api/auth/me", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return UserResponse(
         id=current_user.id,
