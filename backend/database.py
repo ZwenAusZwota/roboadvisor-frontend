@@ -20,6 +20,11 @@ if not DATABASE_URL:
     # URL-encode das Passwort für den Connection String
     encoded_password = quote_plus(DB_PASSWORD)
     DATABASE_URL = f"mysql+pymysql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
+else:
+    # DigitalOcean stellt oft PostgreSQL bereit
+    # Wenn die URL mit postgres:// beginnt, konvertiere zu postgresql://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # SQLAlchemy Engine erstellen
 engine = create_engine(
