@@ -26,7 +26,7 @@ app.add_middleware(
 
 # Passwort-Hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # In-Memory Datenbank (in Produktion durch echte DB ersetzen)
 fake_users_db = {}
@@ -101,7 +101,7 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
-@app.post("/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate):
     # Prüfe ob User bereits existiert
     if user.email in fake_users_db:
@@ -126,7 +126,7 @@ async def register(user: UserCreate):
         email=user.email
     )
 
-@app.post("/api/auth/login", response_model=Token)
+@app.post("/auth/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = get_user(form_data.username)  # username ist hier die email
     if not user:
@@ -147,7 +147,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/api/auth/login-json", response_model=Token)
+@app.post("/auth/login-json", response_model=Token)
 async def login_json(user_login: UserLogin):
     user = get_user(user_login.email)
     if not user:
@@ -166,7 +166,7 @@ async def login_json(user_login: UserLogin):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/api/auth/me", response_model=UserResponse)
+@app.get("/auth/me", response_model=UserResponse)
 async def read_users_me(current_user: dict = Depends(get_current_user)):
     return UserResponse(
         id=current_user["id"],

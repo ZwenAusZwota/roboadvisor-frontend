@@ -1,4 +1,21 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// In Produktion: relative URLs (leer = gleiche Domain)
+// In Entwicklung: localhost:8000
+const getApiBaseUrl = () => {
+  // Wenn VITE_API_URL explizit gesetzt ist, verwende das
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  
+  // In Entwicklung (localhost) verwende localhost:8000
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return 'http://localhost:8000'
+  }
+  
+  // In Produktion: relative URLs (leer = gleiche Domain)
+  return ''
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 class ApiService {
   constructor() {
@@ -75,7 +92,7 @@ class ApiService {
 
   // Health Check
   async healthCheck() {
-    return this.request('/health')
+    return this.request('/api/health')
   }
 }
 
