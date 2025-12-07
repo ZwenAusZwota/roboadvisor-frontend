@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
@@ -110,7 +110,10 @@ async def startup_event():
         print(f"Warning: Could not initialize database: {e}")
         print("Database tables may already exist or connection failed.")
 
-# Routes
+# API Router (ohne Prefix, da DigitalOcean den /api Prefix entfernt)
+api_router = APIRouter()
+
+# Routes ohne Prefix (für Health Checks)
 @app.get("/")
 async def root():
     return {"message": "RoboAdvisor API", "status": "running"}
@@ -133,7 +136,8 @@ async def health_check(db: Session = Depends(get_db)):
             "timestamp": datetime.utcnow().isoformat()
         }
 
-@app.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+# API Routes mit /api Prefix
+@api_router.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     # Prüfe ob User bereits existiert
     db_user = get_user_by_email(db, email=user.email)
@@ -160,7 +164,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         email=db_user.email
     )
 
-@app.post("/auth/login", response_model=Token)
+@api_router.post("/auth/login", response_model=Token)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
@@ -184,7 +188,7 @@ async def login(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/auth/login-json", response_model=Token)
+@api_router.post("/auth/login-json", response_model=Token)
 async def login_json(
     user_login: UserLogin,
     db: Session = Depends(get_db)
@@ -206,13 +210,16 @@ async def login_json(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/auth/me", response_model=UserResponse)
+@api_router.get("/auth/me", response_model=UserResponse)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return UserResponse(
         id=current_user.id,
         name=current_user.name,
         email=current_user.email
     )
+
+# Router zur App hinzufügen
+app.include_router(api_router)
 
 if __name__ == "__main__":
     import uvicorn
