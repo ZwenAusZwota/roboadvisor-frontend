@@ -123,3 +123,5 @@ VITE_API_URL=http://localhost:8000
 - Aktuell In-Memory Storage (fake_users_db)
 - Für Produktion: PostgreSQL oder MySQL über DigitalOcean Database hinzufügen
 
+
+

@@ -29,3 +29,5 @@ uvicorn main:app --reload --port 8000
 
 - `SECRET_KEY` - Secret Key für JWT (in Produktion setzen!)
 
+
+

@@ -126,3 +126,5 @@ static_sites:
 - Prüfe die Ingress-Konfiguration
 - Stelle sicher, dass `/api` als Route konfiguriert ist
 
+
+
