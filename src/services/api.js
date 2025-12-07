@@ -50,13 +50,15 @@ class ApiService {
     try {
       const response = await fetch(url, config)
       
-      // Für Health-Check auch bei nicht-OK Status versuchen, JSON zu parsen
+      // Response-Body als Text lesen (kann nur einmal gelesen werden)
+      const text = await response.text()
+      
+      // Versuche, Text als JSON zu parsen
       let data
       try {
-        data = await response.json()
+        data = text ? JSON.parse(text) : null
       } catch (jsonError) {
-        // Wenn kein JSON, dann Text-Response
-        const text = await response.text()
+        // Wenn kein JSON, dann Text-Response verwenden
         throw new Error(`Server returned: ${response.status} ${response.statusText}. ${text.substring(0, 100)}`)
       }
 
