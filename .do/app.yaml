@@ -2,7 +2,7 @@ name: roboadvisor-app
 region: fra1
 
 services:
-  - name: api
+  - name: backend
     github:
       repo: ZwenAusZwota/roboadvisor-frontend
       branch: main
@@ -14,9 +14,6 @@ services:
     instance_count: 1
     instance_size_slug: basic-xxs
     http_port: 8080
-    routes:
-      - path: /api
-        preserve_path_prefix: true
     envs:
       - key: SECRET_KEY
         value: ${SECRET_KEY}
@@ -29,8 +26,8 @@ ingress:
         path:
           prefix: /api
       component:
-        name: api
-        preserve_path_prefix: true
+        name: backend
+        preserve_path_prefix: false
     - match:
         path:
           prefix: /
