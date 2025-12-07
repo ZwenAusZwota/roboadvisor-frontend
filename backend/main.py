@@ -77,6 +77,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
+    # bcrypt hat ein Limit von 72 Bytes für Passwörter
+    # Wenn das Passwort länger ist, wird es abgeschnitten
+    if len(password.encode('utf-8')) > 72:
+        password = password.encode('utf-8')[:72].decode('utf-8', errors='ignore')
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -195,13 +199,23 @@ async def health_check_api(db: Session = Depends(get_db)):
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     try:
         logger.info(f"Registration attempt for email: {user.email}")
+        
+        # Validierung: Passwort-Länge prüfen (bcrypt Limit: 72 Bytes)
+        password_bytes = len(user.password.encode('utf-8'))
+        if password_bytes > 72:
+            logger.warning(f"Registration failed: Password too long ({password_bytes} bytes) for {user.email}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Passwort ist zu lang. Bitte verwenden Sie maximal 72 Zeichen."
+            )
+        
         # Prüfe ob User bereits existiert
         db_user = get_user_by_email(db, email=user.email)
         if db_user:
             logger.warning(f"Registration failed: Email already registered - {user.email}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                detail="Diese E-Mail-Adresse ist bereits registriert"
             )
         
         # Erstelle neuen User
@@ -228,9 +242,10 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         error_traceback = traceback.format_exc()
         logger.error(f"Registration failed for {user.email}: {str(e)}")
         logger.error(f"Traceback: {error_traceback}")
+        # Generische Fehlermeldung für den Benutzer
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Registration failed: {str(e)}"
+            detail="Registrierung fehlgeschlagen. Bitte versuchen Sie es später erneut."
         )
 
 @api_router.post("/api/auth/login", response_model=Token)
@@ -242,13 +257,13 @@ async def login(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="E-Mail oder Passwort falsch",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not verify_password(form_data.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="E-Mail oder Passwort falsch",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -266,12 +281,12 @@ async def login_json(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+            detail="E-Mail oder Passwort falsch"
         )
     if not verify_password(user_login.password, user.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
+            detail="E-Mail oder Passwort falsch"
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -294,9 +309,10 @@ async def global_exception_handler(request, exc):
     logger.error(f"Unhandled exception: {str(exc)}")
     logger.error(f"Traceback: {error_traceback}")
     logger.error(f"Request: {request.method} {request.url}")
+    # Generische Fehlermeldung für den Benutzer
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": f"Internal server error: {str(exc)}"}
+        content={"detail": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut."}
     )
 
 # Router zur App hinzufügen

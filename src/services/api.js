@@ -33,6 +33,50 @@ class ApiService {
     }
   }
 
+  // Konvertiert HTTP-Status-Codes in benutzerfreundliche Fehlermeldungen
+  getErrorMessage(statusCode, backendMessage) {
+    // Filtere technische Fehlermeldungen heraus
+    const technicalKeywords = [
+      'Internal server error',
+      'Registration failed',
+      'Traceback',
+      'password cannot be longer than 72 bytes',
+      'truncate manually',
+      'cannot be longer',
+      'bytes',
+      'Exception',
+      'Error:',
+      'at ',
+      'File "',
+      'line '
+    ]
+    
+    // Wenn Backend bereits eine benutzerfreundliche Nachricht sendet, verwende diese
+    if (backendMessage && !technicalKeywords.some(keyword => backendMessage.includes(keyword))) {
+      return backendMessage
+    }
+    
+    // Ansonsten generische Nachrichten basierend auf Status-Code
+    switch (statusCode) {
+      case 400:
+        return 'Ungültige Eingabedaten. Bitte überprüfen Sie Ihre Eingaben.'
+      case 401:
+        return 'E-Mail oder Passwort falsch'
+      case 403:
+        return 'Zugriff verweigert'
+      case 404:
+        return 'Ressource nicht gefunden'
+      case 409:
+        return 'Diese E-Mail-Adresse ist bereits registriert'
+      case 500:
+        return 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
+      case 503:
+        return 'Service vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.'
+      default:
+        return 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.'
+    }
+  }
+
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`
     const config = {
@@ -58,18 +102,27 @@ class ApiService {
       try {
         data = text ? JSON.parse(text) : null
       } catch (jsonError) {
-        // Wenn kein JSON, dann Text-Response verwenden
-        throw new Error(`Server returned: ${response.status} ${response.statusText}. ${text.substring(0, 100)}`)
+        // Wenn kein JSON, dann generische Fehlermeldung
+        const errorMessage = this.getErrorMessage(response.status, null)
+        throw new Error(errorMessage)
       }
 
       if (!response.ok) {
-        throw new Error(data.detail || data.error || `HTTP ${response.status}: ${response.statusText}`)
+        // Verwende benutzerfreundliche Fehlermeldung
+        const errorMessage = this.getErrorMessage(response.status, data.detail || data.error)
+        throw new Error(errorMessage)
       }
 
       return data
     } catch (error) {
+      // Logge detaillierte Fehler nur in der Konsole, nicht für den Benutzer
       console.error('API Error:', error)
-      throw error
+      // Wirf nur die benutzerfreundliche Nachricht
+      if (error.message && !error.message.includes('API Error')) {
+        throw error
+      }
+      // Fallback für unerwartete Fehler
+      throw new Error('Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.')
     }
   }
 

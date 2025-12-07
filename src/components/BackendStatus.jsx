@@ -16,7 +16,7 @@ const BackendStatus = () => {
       setStatus(false)
       setStatusInfo({
         status: 'unhealthy',
-        error: error.message || 'Backend nicht erreichbar',
+        error: 'Backend nicht erreichbar',
         timestamp: new Date().toISOString()
       })
     }
@@ -41,11 +41,10 @@ const BackendStatus = () => {
         : 'unbekannt'
       return `Backend ist erreichbar und gesund\n\nDatenbank: ${dbStatus}\nZeitstempel: ${timestamp}`
     }
-    const errorMsg = statusInfo?.error || 'Unbekannter Fehler'
     const timestamp = statusInfo?.timestamp 
       ? new Date(statusInfo.timestamp).toLocaleString('de-DE')
       : new Date().toLocaleString('de-DE')
-    return `Backend ist nicht erreichbar oder ungesund\n\nFehler: ${errorMsg}\nZeitstempel: ${timestamp}`
+    return `Backend ist nicht erreichbar oder ungesund\n\nZeitstempel: ${timestamp}`
   }
 
   return (

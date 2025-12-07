@@ -39,6 +39,13 @@ const LoginModal = ({ isOpen, onClose }) => {
           setLoading(false)
           return
         }
+        // Prüfe Passwort-Länge (bcrypt Limit: 72 Bytes)
+        // Wir prüfen auf 70 Zeichen, um sicherzugehen (UTF-8 kann mehr Bytes sein)
+        if (formData.password.length > 70) {
+          setError('Passwort ist zu lang. Bitte verwenden Sie maximal 70 Zeichen.')
+          setLoading(false)
+          return
+        }
         await api.register(formData.name, formData.email, formData.password)
         // Nach Registrierung automatisch einloggen
         await api.login(formData.email, formData.password)
