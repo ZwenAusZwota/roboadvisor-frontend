@@ -1,15 +1,12 @@
 from fastapi import FastAPI, HTTPException, Depends, status, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-import os
 import logging
 import traceback
 
@@ -25,13 +22,16 @@ logger = logging.getLogger(__name__)
 
 # Database imports
 from database import get_db, init_db, engine
-from models import User, UserSettings
-from user_routes import router as user_router
-
-# Konfiguration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+from models import User
+from auth import (
+    get_password_hash,
+    verify_password,
+    get_user_by_email,
+    get_current_user,
+    create_access_token,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    oauth2_scheme
+)
 
 app = FastAPI(title="RoboAdvisor API", version="1.0.0")
 
@@ -43,12 +43,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Passwort-Hashing mit Argon2 (moderner und sicherer als bcrypt, kein 72-Byte-Limit)
-# Argon2 ist der Gewinner des Password Hashing Competition 2015
-# Wir unterstützen auch bcrypt für Migration bestehender Passwörter
-pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # Pydantic Models
 class UserCreate(BaseModel):
@@ -71,60 +65,6 @@ class UserLogin(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-class TokenData(BaseModel):
-    email: Optional[str] = None
-
-# Hilfsfunktionen
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verifiziert ein Passwort gegen einen Hash.
-    Unterstützt sowohl Argon2 (neu) als auch bcrypt (für Migration).
-    """
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    """
-    Hasht ein Passwort mit Argon2.
-    Argon2 hat kein Passwort-Längenlimit wie bcrypt (72 Bytes).
-    Es unterstützt Passwörter beliebiger Länge.
-    """
-    return pwd_context.hash(password)
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-def get_user_by_email(db: Session, email: str):
-    return db.query(User).filter(User.email == email).first()
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-        token_data = TokenData(email=email)
-    except JWTError:
-        raise credentials_exception
-    user = get_user_by_email(db, email=token_data.email)
-    if user is None:
-        raise credentials_exception
-    return user
 
 # Startup Event: Erstelle Tabellen beim Start
 @app.on_event("startup")
@@ -332,6 +272,9 @@ async def global_exception_handler(request, exc):
 
 # Router zur App hinzufügen
 app.include_router(api_router)
+
+# User routes importieren und hinzufügen (nach api_router, um zirkulären Import zu vermeiden)
+from user_routes import router as user_router
 app.include_router(user_router)
 
 if __name__ == "__main__":

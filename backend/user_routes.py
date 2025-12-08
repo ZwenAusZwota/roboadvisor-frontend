@@ -9,7 +9,7 @@ import logging
 
 from database import get_db
 from models import User, UserSettings
-from main import get_current_user, get_password_hash, verify_password
+from auth import get_current_user, get_password_hash, verify_password
 
 logger = logging.getLogger(__name__)
 
