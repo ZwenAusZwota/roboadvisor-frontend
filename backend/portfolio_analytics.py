@@ -1,15 +1,23 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from decimal import Decimal
 import logging
 import random
+import os
+import json
 
 from database import get_db
 from models import User, PortfolioHolding
 from auth import get_current_user
+
+# OpenAI-Import
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +67,20 @@ class RiskMetrics(BaseModel):
     volatility: Optional[float] = None
     sharpe_ratio: Optional[float] = None
     max_drawdown: Optional[float] = None
+
+class SectorAssignment(BaseModel):
+    position_id: int
+    name: str
+    isin: Optional[str]
+    ticker: Optional[str]
+    sector: Optional[str]
+    error: Optional[str] = None
+
+class SectorCheckResult(BaseModel):
+    all_sectors_assigned: bool
+    assignments: List[SectorAssignment]
+    unique_sectors: List[str]
+    missing_count: int
 
 # Mock-Daten für aktuelle Preise (in Produktion würde man eine API wie Yahoo Finance nutzen)
 MOCK_CURRENT_PRICES = {
@@ -171,6 +193,113 @@ ASSET_CLASS_MAPPING = {
     "US92532F1003": "Aktien",
     "GB00BH4HKS39": "Aktien",
 }
+
+def get_openai_client() -> Optional[OpenAI]:
+    """Erstelle OpenAI-Client mit API-Key aus Umgebungsvariable"""
+    if OpenAI is None:
+        logger.warning("OpenAI-Paket nicht installiert")
+        return None
+    
+    # Prüfe beide möglichen Variablennamen (Tippfehler-tolerant)
+    api_key = os.getenv("OPENAI_SECRET") or os.getenv("OPENAI_SCRET")
+    
+    if not api_key:
+        logger.warning("OPENAI_SECRET oder OPENAI_SCRET nicht in Umgebungsvariablen gefunden")
+        return None
+    
+    try:
+        return OpenAI(api_key=api_key)
+    except Exception as e:
+        logger.error(f"Fehler beim Erstellen des OpenAI-Clients: {e}")
+        return None
+
+async def get_sectors_from_openai(positions: List[Dict[str, Any]]) -> Dict[int, str]:
+    """
+    Fragt die OpenAI-API nach Branchen für alle Portfolio-Positionen auf einmal.
+    
+    Args:
+        positions: Liste von Dictionaries mit position_id, name, isin, ticker
+        
+    Returns:
+        Dictionary mit position_id -> Branche
+    """
+    if not positions:
+        return {}
+    
+    client = get_openai_client()
+    if not client:
+        logger.warning("OpenAI-Client nicht verfügbar, verwende Fallback")
+        return {}
+    
+    try:
+        # Erstelle Prompt für alle Positionen auf einmal
+        positions_info = []
+        for pos in positions:
+            info_parts = [f"Name: {pos['name']}"]
+            if pos.get('isin'):
+                info_parts.append(f"ISIN: {pos['isin']}")
+            if pos.get('ticker'):
+                info_parts.append(f"Ticker: {pos['ticker']}")
+            positions_info.append({
+                "id": pos['position_id'],
+                "info": " | ".join(info_parts)
+            })
+        
+        prompt = (
+            "Bestimme für folgende Wertpapiere die Branche (Sector). "
+            "Antworte NUR mit einem JSON-Objekt im Format: "
+            '{"position_id": "Branche", ...}. '
+            "Verwende deutsche Branchenbezeichnungen wie: Technologie, Finanzen, "
+            "Gesundheitswesen, Konsumgüter, Energie, Industrie, etc. "
+            "Falls die Branche nicht bestimmt werden kann, verwende 'Unbekannt'.\n\n"
+            "Wertpapiere:\n"
+        )
+        
+        for pos_info in positions_info:
+            prompt += f"- ID {pos_info['id']}: {pos_info['info']}\n"
+        
+        prompt += "\nAntworte NUR mit dem JSON-Objekt, keine weiteren Erklärungen."
+        
+        # Rufe OpenAI API auf
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Kostengünstiges Modell
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Du bist ein Finanzexperte, der Wertpapiere Branchen zuordnet. Antworte nur mit JSON."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.3,  # Niedrige Temperatur für konsistente Ergebnisse
+            response_format={"type": "json_object"}
+        )
+        
+        # Parse Antwort
+        content = response.choices[0].message.content.strip()
+        
+        # Versuche JSON zu parsen
+        try:
+            sectors_dict = json.loads(content)
+            # Konvertiere String-Keys zu Integer
+            result = {}
+            for key, value in sectors_dict.items():
+                try:
+                    position_id = int(key)
+                    result[position_id] = str(value) if value else "Unbekannt"
+                except (ValueError, TypeError):
+                    continue
+            return result
+        except json.JSONDecodeError as e:
+            logger.error(f"Fehler beim Parsen der OpenAI-Antwort: {e}")
+            logger.error(f"Antwort war: {content}")
+            return {}
+            
+    except Exception as e:
+        logger.error(f"Fehler bei OpenAI API-Aufruf: {e}")
+        return {}
 
 def get_current_price(isin: Optional[str], ticker: Optional[str]) -> Optional[float]:
     """Hole aktuellen Preis (Mock-Implementierung)"""
@@ -387,5 +516,79 @@ async def get_risk_metrics(
         volatility=round(15 + random.random() * 10, 2),  # 15% - 25%
         sharpe_ratio=round(1.2 + random.random() * 0.8, 2),  # 1.2 - 2.0
         max_drawdown=round(-5 - random.random() * 10, 2)  # -5% bis -15%
+    )
+
+# GET /api/portfolio/dashboard/check-sectors
+@router.get("/api/portfolio/dashboard/check-sectors", response_model=SectorCheckResult)
+async def check_portfolio_sectors(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Prüft, ob alle Portfoliowerte einer Branche zugeordnet sind.
+    Nutzt die OpenAI-API, um fehlende Branchenzuordnungen zu bestimmen.
+    """
+    holdings = db.query(PortfolioHolding).filter(
+        PortfolioHolding.userId == current_user.id
+    ).all()
+    
+    if not holdings:
+        return SectorCheckResult(
+            all_sectors_assigned=True,
+            assignments=[],
+            unique_sectors=[],
+            missing_count=0
+        )
+    
+    # Bereite Positionsdaten für OpenAI vor
+    positions_data = []
+    for holding in holdings:
+        positions_data.append({
+            'position_id': holding.id,
+            'name': holding.name,
+            'isin': holding.isin,
+            'ticker': holding.ticker
+        })
+    
+    # Rufe OpenAI-API auf, um Branchen zu bestimmen
+    sectors_from_openai = await get_sectors_from_openai(positions_data)
+    
+    # Erstelle Assignments
+    assignments = []
+    unique_sectors_set = set()
+    missing_count = 0
+    
+    for holding in holdings:
+        # Versuche zuerst OpenAI-Ergebnis, dann Mock-Daten, dann "Unbekannt"
+        sector = None
+        error = None
+        
+        if holding.id in sectors_from_openai:
+            sector = sectors_from_openai[holding.id]
+        elif holding.isin and holding.isin in SECTOR_MAPPING:
+            sector = SECTOR_MAPPING[holding.isin]
+        else:
+            sector = "Unbekannt"
+            missing_count += 1
+        
+        if sector and sector != "Unbekannt":
+            unique_sectors_set.add(sector)
+        
+        assignments.append(SectorAssignment(
+            position_id=holding.id,
+            name=holding.name,
+            isin=holding.isin,
+            ticker=holding.ticker,
+            sector=sector,
+            error=error
+        ))
+    
+    all_sectors_assigned = missing_count == 0
+    
+    return SectorCheckResult(
+        all_sectors_assigned=all_sectors_assigned,
+        assignments=assignments,
+        unique_sectors=sorted(list(unique_sectors_set)),
+        missing_count=missing_count
     )
 
