@@ -12,9 +12,12 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # OpenAI Client initialisieren
-openai_api_key = os.getenv("OPENAI_API_KEY")
+# Unterstützt sowohl OPENAI_API_KEY als auch OPENAI_SECRET (für Flexibilität)
+openai_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_SECRET")
 if not openai_api_key:
-    logger.warning("OPENAI_API_KEY nicht gesetzt. OpenAI-Funktionen werden nicht verfügbar sein.")
+    logger.warning("OPENAI_API_KEY oder OPENAI_SECRET nicht gesetzt. OpenAI-Funktionen werden nicht verfügbar sein.")
+else:
+    logger.info("OpenAI API Key gefunden, Client initialisiert")
 
 client = OpenAI(api_key=openai_api_key) if openai_api_key else None
 
@@ -175,7 +178,7 @@ async def analyze_portfolio(
         Exception: Bei OpenAI API Fehlern
     """
     if not client:
-        raise ValueError("OPENAI_API_KEY ist nicht gesetzt. Bitte konfigurieren Sie die OpenAI API.")
+        raise ValueError("OPENAI_API_KEY oder OPENAI_SECRET ist nicht gesetzt. Bitte konfigurieren Sie die OpenAI API in den Environment Variables.")
     
     if not holdings:
         raise ValueError("Portfolio ist leer. Bitte fügen Sie Positionen hinzu.")
