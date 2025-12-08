@@ -1,0 +1,445 @@
+/* AI Analysis Components Styles */
+
+.ai-analysis-container {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.ai-analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.ai-analysis-header h2 {
+  margin: 0;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.analyze-button {
+  padding: 0.75rem 1.5rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.analyze-button:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.analyze-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.analyze-button.loading {
+  position: relative;
+  color: transparent;
+}
+
+.analyze-button.loading::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  margin-left: -8px;
+  margin-top: -8px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.ai-analysis-error {
+  padding: 1rem;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  color: #721c24;
+  margin-bottom: 1rem;
+}
+
+.ai-analysis-overview {
+  margin-bottom: 2rem;
+}
+
+.ai-analysis-overview h3 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.analysis-summary-grid {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.summary-label {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.summary-value {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.cached-badge .summary-value {
+  color: #007bff;
+  font-size: 0.875rem;
+}
+
+/* Position Analysis */
+.ai-position-analysis {
+  margin-bottom: 2rem;
+}
+
+.ai-position-analysis h3 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.positions-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.position-analysis-card {
+  background: white;
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.position-header h4 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.125rem;
+}
+
+.analysis-section {
+  margin-bottom: 1rem;
+}
+
+.analysis-section:last-child {
+  margin-bottom: 0;
+}
+
+.analysis-section h5 {
+  margin: 0 0 0.5rem 0;
+  color: #555;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.position-analysis-summary {
+  margin: 0.5rem 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+.valuation-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.valuation-fair {
+  background: #e7f3ff;
+  color: #0066cc;
+}
+
+.valuation-undervalued {
+  background: #d4edda;
+  color: #155724;
+}
+
+.valuation-overvalued {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.technical-details {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.detail-value {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.detail-value.signal {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  display: inline-block;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.signal-buy {
+  background: #d4edda;
+  color: #155724;
+}
+
+.signal-sell {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.signal-hold {
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* Risk Overview */
+.ai-risk-overview {
+  margin-bottom: 2rem;
+}
+
+.ai-risk-overview h3 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.risks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.risk-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 6px;
+  border-left: 4px solid #ffc107;
+}
+
+.risk-icon {
+  font-size: 1.25rem;
+}
+
+.risk-text {
+  flex: 1;
+  color: #333;
+  line-height: 1.6;
+}
+
+.cash-assessment {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.cash-assessment h4 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.cash-assessment p {
+  margin: 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* Rebalancing */
+.ai-rebalancing {
+  margin-bottom: 2rem;
+}
+
+.ai-rebalancing h3 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.diversification-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.breakdown-section {
+  background: white;
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.breakdown-section h4 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1rem;
+}
+
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.breakdown-item {
+  display: grid;
+  grid-template-columns: 150px 1fr 60px;
+  gap: 1rem;
+  align-items: center;
+}
+
+.breakdown-label {
+  font-size: 0.875rem;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breakdown-bar {
+  height: 20px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.breakdown-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  transition: width 0.3s ease;
+}
+
+.breakdown-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #333;
+  text-align: right;
+}
+
+.rebalancing-suggestions {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.rebalancing-suggestions h4 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.rebalancing-suggestions p {
+  margin: 0;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* Advice */
+.ai-advice {
+  margin-bottom: 2rem;
+}
+
+.ai-advice h3 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.advice-section {
+  padding: 1.25rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 1rem;
+}
+
+.advice-section:last-child {
+  margin-bottom: 0;
+}
+
+.advice-section h4 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  font-size: 1rem;
+}
+
+.advice-section p {
+  margin: 0;
+  color: #666;
+  line-height: 1.8;
+}
+
+.advice-section.short-term {
+  border-left: 4px solid #ffc107;
+}
+
+.advice-section.long-term {
+  border-left: 4px solid #28a745;
+}
+
+/* Loading State */
+.ai-analysis-loading {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+}
+
+.ai-analysis-loading::after {
+  content: "...";
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: "."; }
+  40% { content: ".."; }
+  60%, 100% { content: "..."; }
+}
+
+/* Empty State */
+.ai-analysis-empty {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+

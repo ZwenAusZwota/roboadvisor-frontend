@@ -288,6 +288,10 @@ app.include_router(portfolio_router)
 from portfolio_analytics import router as analytics_router
 app.include_router(analytics_router)
 
+# Portfolio analysis routes importieren und hinzufügen
+from portfolio_analysis_routes import router as portfolio_analysis_router
+app.include_router(portfolio_analysis_router)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

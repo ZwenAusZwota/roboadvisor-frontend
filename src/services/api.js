@@ -333,6 +333,20 @@ class ApiService {
   async getRiskMetrics() {
     return this.request('/api/portfolio/dashboard/risk')
   }
+
+  // Portfolio Analysis Endpoints
+  async analyzePortfolio(forceRefresh = false) {
+    return this.request('/api/portfolio/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ force_refresh: forceRefresh }),
+    })
+  }
+
+  async clearAnalysisCache() {
+    return this.request('/api/portfolio/analyze/cache', {
+      method: 'DELETE',
+    })
+  }
 }
 
 export default new ApiService()

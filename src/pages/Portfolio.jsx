@@ -5,6 +5,7 @@ import ToastContainer from '../components/ToastContainer'
 import PortfolioList from '../components/portfolio/PortfolioList'
 import ManualEntry from '../components/portfolio/ManualEntry'
 import CSVUpload from '../components/portfolio/CSVUpload'
+import AIAnalysisSection from '../components/portfolio/AIAnalysis/AIAnalysisSection'
 import './Portfolio.css'
 
 const Portfolio = () => {
@@ -59,12 +60,15 @@ const Portfolio = () => {
 
           <div className="portfolio-tab-content">
             {activeTab === 'list' && (
-              <PortfolioList 
-                refreshTrigger={refreshTrigger}
-                showSuccess={showSuccess}
-                showError={showError}
-                onRefresh={handleRefresh}
-              />
+              <>
+                <PortfolioList 
+                  refreshTrigger={refreshTrigger}
+                  showSuccess={showSuccess}
+                  showError={showError}
+                  onRefresh={handleRefresh}
+                />
+                <AIAnalysisSection />
+              </>
             )}
             {activeTab === 'manual' && (
               <ManualEntry 
