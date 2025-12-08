@@ -236,6 +236,86 @@ class ApiService {
       method: 'DELETE',
     })
   }
+
+  // Portfolio Endpoints
+  async getPortfolio() {
+    return this.request('/api/portfolio')
+  }
+
+  async getPortfolioHolding(id) {
+    return this.request(`/api/portfolio/${id}`)
+  }
+
+  async createPortfolioHolding(holding) {
+    return this.request('/api/portfolio', {
+      method: 'POST',
+      body: JSON.stringify(holding),
+    })
+  }
+
+  async updatePortfolioHolding(id, holding) {
+    return this.request(`/api/portfolio/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(holding),
+    })
+  }
+
+  async deletePortfolioHolding(id) {
+    return this.request(`/api/portfolio/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async uploadPortfolioCSV(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(`${this.baseURL}/api/portfolio/upload-csv`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+      body: formData,
+    })
+
+    const text = await response.text()
+    let data
+    try {
+      data = text ? JSON.parse(text) : null
+    } catch (jsonError) {
+      const errorMessage = this.getErrorMessage(response.status, null)
+      throw new Error(errorMessage)
+    }
+
+    if (!response.ok) {
+      const errorMessage = this.getErrorMessage(response.status, data.detail || data.error)
+      throw new Error(errorMessage)
+    }
+
+    return data
+  }
+
+  async downloadCSVTemplate() {
+    const response = await fetch(`${this.baseURL}/api/portfolio/csv-template`, {
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('Fehler beim Herunterladen des Templates')
+    }
+
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'portfolio_template.csv'
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  }
 }
 
 export default new ApiService()

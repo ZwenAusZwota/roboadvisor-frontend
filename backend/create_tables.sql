@@ -58,3 +58,21 @@ CREATE TABLE IF NOT EXISTS user_settings (
 
 CREATE INDEX IF NOT EXISTS ix_user_settings_userId ON user_settings("userId");
 
+CREATE TABLE IF NOT EXISTS portfolio_holdings (
+    id SERIAL PRIMARY KEY,
+    "userId" INTEGER NOT NULL,
+    isin VARCHAR(12),
+    ticker VARCHAR(20),
+    name VARCHAR(255) NOT NULL,
+    purchase_date TIMESTAMP NOT NULL,
+    quantity INTEGER NOT NULL,
+    purchase_price VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_portfolio_holdings_userId ON portfolio_holdings("userId");
+CREATE INDEX IF NOT EXISTS ix_portfolio_holdings_isin ON portfolio_holdings(isin);
+CREATE INDEX IF NOT EXISTS ix_portfolio_holdings_ticker ON portfolio_holdings(ticker);
+

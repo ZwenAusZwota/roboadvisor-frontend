@@ -51,7 +51,7 @@ def get_db():
 # Helper function für init_db
 def init_db():
     """Erstellt alle Tabellen in der Datenbank"""
-    from models import User, RiskProfile, Security, TelegramUser, UserSettings
+    from models import User, RiskProfile, Security, TelegramUser, UserSettings, PortfolioHolding
     from sqlalchemy import inspect
     
     try:
@@ -60,7 +60,7 @@ def init_db():
         existing_tables = inspector.get_table_names()
         
         # Definiere alle erwarteten Tabellen
-        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings']
+        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings', 'portfolio_holdings']
         missing_tables = [table for table in expected_tables if table not in existing_tables]
         
         if missing_tables:

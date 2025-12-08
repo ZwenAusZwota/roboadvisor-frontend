@@ -3,7 +3,7 @@ Database Initialization Script
 Erstellt alle Tabellen basierend auf den SQLAlchemy Models
 """
 from database import engine, Base
-from models import User, RiskProfile, Security, TelegramUser, UserSettings
+from models import User, RiskProfile, Security, TelegramUser, UserSettings, PortfolioHolding
 
 def init_db():
     """Erstellt alle Tabellen in der Datenbank"""

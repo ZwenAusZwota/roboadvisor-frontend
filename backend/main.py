@@ -76,7 +76,7 @@ async def startup_event():
         from sqlalchemy import inspect
         inspector = inspect(engine)
         existing_tables = inspector.get_table_names()
-        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings']
+        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings', 'portfolio_holdings']
         missing_tables = [table for table in expected_tables if table not in existing_tables]
         
         if missing_tables:
@@ -279,6 +279,10 @@ app.include_router(api_router)
 # User routes importieren und hinzufügen (nach api_router, um zirkulären Import zu vermeiden)
 from user_routes import router as user_router
 app.include_router(user_router)
+
+# Portfolio routes importieren und hinzufügen
+from portfolio_routes import router as portfolio_router
+app.include_router(portfolio_router)
 
 if __name__ == "__main__":
     import uvicorn

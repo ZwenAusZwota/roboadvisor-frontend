@@ -16,6 +16,7 @@ class User(Base):
     risk_profiles = relationship("RiskProfile", back_populates="user", cascade="all, delete-orphan")
     securities = relationship("Security", back_populates="user", cascade="all, delete-orphan")
     settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
 
 class RiskProfile(Base):
     __tablename__ = "risk_profiles"
@@ -41,6 +42,23 @@ class Security(Base):
     
     # Relationship
     user = relationship("User", back_populates="securities")
+
+class PortfolioHolding(Base):
+    __tablename__ = "portfolio_holdings"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    userId = Column(Integer, ForeignKey("users.id"), nullable=False)
+    isin = Column(String(12), nullable=True)  # ISIN ist 12 Zeichen lang
+    ticker = Column(String(20), nullable=True)  # Ticker-Symbol
+    name = Column(String(255), nullable=False)  # Name des Wertpapiers
+    purchase_date = Column(DateTime, nullable=False)  # Kaufdatum
+    quantity = Column(Integer, nullable=False)  # Anzahl
+    purchase_price = Column(String(50), nullable=False)  # Kaufpreis (als String für Flexibilität)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # Relationship
+    user = relationship("User", back_populates="portfolio_holdings")
 
 class TelegramUser(Base):
     __tablename__ = "telegram_users"
