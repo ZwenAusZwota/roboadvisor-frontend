@@ -11,6 +11,8 @@ import logging
 from database import get_db
 from models import User, PortfolioHolding
 from auth import get_current_user
+# Importiere OpenAI-Funktionen aus portfolio_analytics
+from portfolio_analytics import get_sectors_from_openai, SECTOR_MAPPING
 
 logger = logging.getLogger(__name__)
 
@@ -106,10 +108,57 @@ async def get_portfolio(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Hole alle Portfolio-Positionen des aktuellen Nutzers"""
+    """
+    Hole alle Portfolio-Positionen des aktuellen Nutzers.
+    Prüft automatisch, ob alle Positionen einer Branche zugeordnet sind,
+    und sendet fehlende Positionen an OpenAI zur Klassifizierung.
+    """
     holdings = db.query(PortfolioHolding).filter(
         PortfolioHolding.userId == current_user.id
     ).order_by(PortfolioHolding.purchase_date.desc()).all()
+    
+    if not holdings:
+        return []
+    
+    # Prüfe, welche Positionen keine Branchenzuordnung haben
+    positions_without_sector = []
+    for holding in holdings:
+        has_sector = False
+        # Prüfe, ob die Position eine Branche in SECTOR_MAPPING hat
+        if holding.isin and holding.isin in SECTOR_MAPPING:
+            has_sector = True
+        
+        if not has_sector:
+            positions_without_sector.append({
+                'position_id': holding.id,
+                'name': holding.name,
+                'isin': holding.isin,
+                'ticker': holding.ticker
+            })
+    
+    # Wenn Positionen ohne Branchenzuordnung gefunden wurden, sende sie an OpenAI
+    if positions_without_sector:
+        logger.info(f"Gefunden {len(positions_without_sector)} Positionen ohne Branchenzuordnung für User {current_user.id}. Sende an OpenAI zur Klassifizierung.")
+        try:
+            # Rufe OpenAI auf, um Branchen für die fehlenden Positionen zu bestimmen
+            sectors_from_openai = await get_sectors_from_openai(positions_without_sector)
+            
+            if sectors_from_openai:
+                logger.info(f"OpenAI hat Branchen für {len(sectors_from_openai)} Positionen zurückgegeben")
+                # Hier könnten wir die Branchenzuordnungen in die Datenbank speichern,
+                # wenn wir ein sector-Feld im Modell hätten.
+                # Für jetzt loggen wir sie nur.
+                for position_id, sector in sectors_from_openai.items():
+                    holding = next((h for h in holdings if h.id == position_id), None)
+                    if holding:
+                        logger.info(f"Position {holding.id} ({holding.name}): Branche '{sector}' von OpenAI bestimmt")
+            else:
+                logger.warning("OpenAI hat keine Branchenzuordnungen zurückgegeben")
+        except Exception as e:
+            # Fehler bei OpenAI-Aufruf sollte nicht den gesamten Portfolio-Abruf blockieren
+            logger.error(f"Fehler beim Aufruf von OpenAI für Branchenklassifizierung: {e}")
+    else:
+        logger.info(f"Alle {len(holdings)} Positionen des Users {current_user.id} haben eine Branchenzuordnung")
     
     return [
         PortfolioHoldingResponse(
