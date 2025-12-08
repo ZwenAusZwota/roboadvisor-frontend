@@ -29,12 +29,20 @@ const Portfolio = () => {
         <div className="portfolio-content">
           <div className="portfolio-header">
             <h1>Portfolio Management</h1>
-            <button 
-              className="btn-secondary"
-              onClick={() => navigate('/')}
-            >
-              Zurück zur Startseite
-            </button>
+            <div className="header-actions">
+              <button 
+                className="btn-primary"
+                onClick={() => navigate('/dashboard')}
+              >
+                Dashboard anzeigen
+              </button>
+              <button 
+                className="btn-secondary"
+                onClick={() => navigate('/')}
+              >
+                Zurück zur Startseite
+              </button>
+            </div>
           </div>
 
           <div className="portfolio-tabs">

@@ -1,8 +1,26 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import api from '../services/api'
 import './Home.css'
 
 const Home = () => {
+  const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const token = localStorage.getItem('auth_token')
+      if (token) {
+        try {
+          const userData = await api.getCurrentUser()
+          setUser(userData)
+        } catch (err) {
+          // User nicht eingeloggt
+        }
+      }
+    }
+    checkUser()
+  }, [])
+
   return (
     <div className="home">
       <section className="hero">
@@ -42,6 +60,23 @@ const Home = () => {
               Verwalte deine Wertpapiere und optimiere dein Portfolio.
             </p>
           </Link>
+
+          {user && (
+            <Link to="/dashboard" className="feature-card">
+              <div className="feature-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+              </div>
+              <h3 className="feature-title">Mein Portfolio</h3>
+              <p className="feature-description">
+                Übersicht über dein Portfolio mit Performance, Aufteilung und Risikoindikatoren.
+              </p>
+            </Link>
+          )}
         </div>
       </section>
     </div>

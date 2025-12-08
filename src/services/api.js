@@ -316,6 +316,23 @@ class ApiService {
     window.URL.revokeObjectURL(url)
     document.body.removeChild(a)
   }
+
+  // Portfolio Dashboard Endpoints
+  async getPortfolioSummary() {
+    return this.request('/api/portfolio/dashboard/summary')
+  }
+
+  async getPerformanceHistory(days = 30) {
+    return this.request(`/api/portfolio/dashboard/performance?days=${days}`)
+  }
+
+  async getPortfolioAllocation() {
+    return this.request('/api/portfolio/dashboard/allocation')
+  }
+
+  async getRiskMetrics() {
+    return this.request('/api/portfolio/dashboard/risk')
+  }
 }
 
 export default new ApiService()

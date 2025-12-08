@@ -24,6 +24,12 @@
   gap: 1rem;
 }
 
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .portfolio-header h1 {
   color: #2d3748;
   font-size: 2rem;

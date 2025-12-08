@@ -5,6 +5,7 @@ import Home from './pages/Home'
 import Contact from './pages/Contact'
 import Profile from './pages/Profile'
 import Portfolio from './pages/Portfolio'
+import Dashboard from './pages/Dashboard'
 import Footer from './components/Footer'
 import './App.css'
 
@@ -20,6 +21,7 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/risk_profile" element={<Home />} />
             <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/dashboard" element={<Dashboard />} />
           </Routes>
         </main>
         <Footer />

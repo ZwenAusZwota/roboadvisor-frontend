@@ -130,7 +130,10 @@ const Header = () => {
                 <li><Link to="/" className="nav-link">Home</Link></li>
                 <li><Link to="/contact" className="nav-link">Kontakt</Link></li>
                 {user && (
-                  <li><Link to="/portfolio" className="nav-link">Portfolio</Link></li>
+                  <>
+                    <li><Link to="/portfolio" className="nav-link">Portfolio</Link></li>
+                    <li><Link to="/dashboard" className="nav-link">Dashboard</Link></li>
+                  </>
                 )}
                 <li>
                   {loading ? (
