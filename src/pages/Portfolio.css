@@ -214,6 +214,41 @@
   font-size: 0.85rem;
 }
 
+.date-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.date-input-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.date-toggle-btn {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.date-toggle-btn:hover {
+  background: #cbd5e0;
+}
+
+.date-toggle-btn.active {
+  background: #667eea;
+  color: white;
+  border-color: #667eea;
+}
+
 .form-note {
   padding: 0.75rem;
   background: #edf2f7;

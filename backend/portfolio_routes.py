@@ -64,19 +64,41 @@ def validate_isin(isin: str) -> bool:
 # Helper function to parse date
 def parse_date(date_str: str) -> datetime:
     """Parst verschiedene Datumsformate"""
+    if not date_str or not date_str.strip():
+        raise ValueError("Datum darf nicht leer sein")
+    
+    date_str = date_str.strip()
+    
+    # Erweiterte Liste von Datumsformaten
     formats = [
-        "%Y-%m-%d",
-        "%d.%m.%Y",
-        "%d/%m/%Y",
-        "%Y-%m-%d %H:%M:%S",
-        "%d.%m.%Y %H:%M:%S",
+        "%Y-%m-%d",           # ISO Format: 2024-01-15
+        "%d.%m.%Y",           # Deutsch: 15.01.2024
+        "%d/%m/%Y",           # US Format: 15/01/2024
+        "%Y-%m-%d %H:%M:%S",  # ISO mit Zeit: 2024-01-15 10:30:00
+        "%d.%m.%Y %H:%M:%S",  # Deutsch mit Zeit: 15.01.2024 10:30:00
+        "%d/%m/%Y %H:%M:%S",  # US mit Zeit: 15/01/2024 10:30:00
+        "%Y/%m/%d",           # Alternative: 2024/01/15
+        "%d-%m-%Y",           # Alternative: 15-01-2024
+        "%Y.%m.%d",           # Alternative: 2024.01.15
+        "%d %m %Y",           # Mit Leerzeichen: 15 01 2024
     ]
+    
     for fmt in formats:
         try:
-            return datetime.strptime(date_str.strip(), fmt)
+            return datetime.strptime(date_str, fmt)
         except ValueError:
             continue
-    raise ValueError(f"Ungültiges Datumsformat: {date_str}")
+    
+    # Versuche auch ISO-Format mit T-Zeit-Separator
+    try:
+        # ISO 8601 Format: 2024-01-15T10:30:00 oder 2024-01-15T10:30:00Z
+        if 'T' in date_str:
+            date_part = date_str.split('T')[0]
+            return datetime.strptime(date_part, "%Y-%m-%d")
+    except ValueError:
+        pass
+    
+    raise ValueError(f"Ungültiges Datumsformat: '{date_str}'. Unterstützte Formate: YYYY-MM-DD, DD.MM.YYYY, DD/MM/YYYY")
 
 # GET /api/portfolio
 @router.get("/api/portfolio", response_model=List[PortfolioHoldingResponse])
@@ -144,17 +166,30 @@ async def create_portfolio_holding(
 ):
     """Erstelle eine neue Portfolio-Position"""
     try:
+        logger.info(f"Creating portfolio holding for user {current_user.id}: name={holding.name}, date={holding.purchase_date}")
+        
+        # Normalisiere leere Strings zu None
+        isin = holding.isin.strip() if holding.isin and holding.isin.strip() else None
+        ticker = holding.ticker.strip() if holding.ticker and holding.ticker.strip() else None
+        name = holding.name.strip() if holding.name else None
+        
         # Validierung
-        if not holding.isin and not holding.ticker:
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Name ist erforderlich"
+            )
+        
+        if not isin and not ticker:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="ISIN oder Ticker muss angegeben werden"
             )
         
-        if holding.isin and not validate_isin(holding.isin):
+        if isin and not validate_isin(isin):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Ungültiges ISIN-Format (muss 12 Zeichen alphanumerisch sein)"
+                detail=f"Ungültiges ISIN-Format: '{isin}'. ISIN muss genau 12 Zeichen alphanumerisch sein"
             )
         
         if holding.quantity <= 0:
@@ -163,7 +198,19 @@ async def create_portfolio_holding(
                 detail="Anzahl muss größer als 0 sein"
             )
         
+        if not holding.purchase_price or not holding.purchase_price.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Kaufpreis ist erforderlich"
+            )
+        
         # Parse purchase_date
+        if not holding.purchase_date or not holding.purchase_date.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Kaufdatum ist erforderlich"
+            )
+        
         try:
             purchase_date = parse_date(holding.purchase_date)
         except ValueError as e:
@@ -175,12 +222,12 @@ async def create_portfolio_holding(
         # Erstelle neue Position
         new_holding = PortfolioHolding(
             userId=current_user.id,
-            isin=holding.isin.upper() if holding.isin else None,
-            ticker=holding.ticker.upper() if holding.ticker else None,
-            name=holding.name,
+            isin=isin.upper() if isin else None,
+            ticker=ticker.upper() if ticker else None,
+            name=name,
             purchase_date=purchase_date,
             quantity=holding.quantity,
-            purchase_price=holding.purchase_price
+            purchase_price=holding.purchase_price.strip()
         )
         
         db.add(new_holding)
@@ -204,7 +251,11 @@ async def create_portfolio_holding(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Error creating portfolio holding: {str(e)}")
+        import traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"Error creating portfolio holding for user {current_user.id}: {str(e)}")
+        logger.error(f"Traceback: {error_traceback}")
+        logger.error(f"Request data: isin={holding.isin}, ticker={holding.ticker}, name={holding.name}, date={holding.purchase_date}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Fehler beim Erstellen der Portfolio-Position"
