@@ -436,8 +436,8 @@ async def get_portfolio_allocation(
     # Berechne Aufteilung nach Branchen
     sector_values: Dict[str, float] = {}
     for h, p in zip(holdings, positions):
-        isin = h.isin or ""
-        sector = SECTOR_MAPPING.get(isin, "Sonstige")
+        # Verwende zuerst Branche aus Datenbank, dann SECTOR_MAPPING, dann "Sonstige"
+        sector = h.sector if h.sector else (SECTOR_MAPPING.get(h.isin, "Sonstige") if h.isin else "Sonstige")
         value = p.current_value if p.current_value else p.purchase_value
         sector_values[sector] = sector_values.get(sector, 0) + value
     
@@ -559,11 +559,13 @@ async def check_portfolio_sectors(
     missing_count = 0
     
     for holding in holdings:
-        # Versuche zuerst OpenAI-Ergebnis, dann Mock-Daten, dann "Unbekannt"
+        # Versuche zuerst Datenbank-Feld, dann OpenAI-Ergebnis, dann Mock-Daten, dann "Unbekannt"
         sector = None
         error = None
         
-        if holding.id in sectors_from_openai:
+        if holding.sector:
+            sector = holding.sector
+        elif holding.id in sectors_from_openai:
             sector = sectors_from_openai[holding.id]
         elif holding.isin and holding.isin in SECTOR_MAPPING:
             sector = SECTOR_MAPPING[holding.isin]

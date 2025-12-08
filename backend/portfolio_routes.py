@@ -26,6 +26,7 @@ class PortfolioHoldingCreate(BaseModel):
     purchase_date: str  # ISO format string
     quantity: float  # Unterstützt Dezimalzahlen
     purchase_price: str
+    sector: Optional[str] = None  # Branche (optional beim Erstellen)
 
 class PortfolioHoldingUpdate(BaseModel):
     isin: Optional[str] = None
@@ -34,6 +35,7 @@ class PortfolioHoldingUpdate(BaseModel):
     purchase_date: Optional[str] = None
     quantity: Optional[float] = None
     purchase_price: Optional[str] = None
+    sector: Optional[str] = None  # Branche
 
 class PortfolioHoldingResponse(BaseModel):
     id: int
@@ -43,6 +45,7 @@ class PortfolioHoldingResponse(BaseModel):
     purchase_date: str
     quantity: float  # Als float für JSON-Serialisierung
     purchase_price: str
+    sector: Optional[str] = None  # Branche
     created_at: str
     updated_at: str
     
@@ -121,11 +124,19 @@ async def get_portfolio(
         return []
     
     # Prüfe, welche Positionen keine Branchenzuordnung haben
+    # Eine Position hat eine Branche, wenn sie im sector-Feld der DB steht oder in SECTOR_MAPPING ist
     positions_without_sector = []
+    sectors_from_openai = {}  # Initialisiere als leeres Dict
+    
     for holding in holdings:
         has_sector = False
-        # Prüfe, ob die Position eine Branche in SECTOR_MAPPING hat
-        if holding.isin and holding.isin in SECTOR_MAPPING:
+        # Prüfe, ob die Position bereits eine Branche in der Datenbank hat
+        if holding.sector:
+            has_sector = True
+        # Oder prüfe, ob die Position eine Branche in SECTOR_MAPPING hat
+        elif holding.isin and holding.isin in SECTOR_MAPPING:
+            # Wenn in SECTOR_MAPPING gefunden, setze die Branche in der DB
+            holding.sector = SECTOR_MAPPING[holding.isin]
             has_sector = True
         
         if not has_sector:
@@ -145,13 +156,17 @@ async def get_portfolio(
             
             if sectors_from_openai:
                 logger.info(f"OpenAI hat Branchen für {len(sectors_from_openai)} Positionen zurückgegeben")
-                # Hier könnten wir die Branchenzuordnungen in die Datenbank speichern,
-                # wenn wir ein sector-Feld im Modell hätten.
-                # Für jetzt loggen wir sie nur.
+                # Speichere Branchenzuordnungen in der Datenbank
                 for position_id, sector in sectors_from_openai.items():
                     holding = next((h for h in holdings if h.id == position_id), None)
-                    if holding:
-                        logger.info(f"Position {holding.id} ({holding.name}): Branche '{sector}' von OpenAI bestimmt")
+                    if holding and sector and sector != "Unbekannt":
+                        holding.sector = sector
+                        logger.info(f"Branche '{sector}' für Position {holding.id} ({holding.name}) wird in Datenbank gespeichert")
+                
+                # Commit alle Änderungen auf einmal
+                if sectors_from_openai:
+                    db.commit()
+                    logger.info(f"{len(sectors_from_openai)} Branchenzuordnungen erfolgreich in Datenbank gespeichert")
             else:
                 logger.warning("OpenAI hat keine Branchenzuordnungen zurückgegeben")
         except Exception as e:
@@ -169,6 +184,7 @@ async def get_portfolio(
             purchase_date=h.purchase_date.isoformat(),
             quantity=float(h.quantity) if h.quantity else 0,
             purchase_price=h.purchase_price,
+            sector=h.sector,
             created_at=h.created_at.isoformat(),
             updated_at=h.updated_at.isoformat()
         )
@@ -202,6 +218,7 @@ async def get_portfolio_holding(
         purchase_date=holding.purchase_date.isoformat(),
         quantity=float(holding.quantity) if holding.quantity else 0,
         purchase_price=holding.purchase_price,
+        sector=holding.sector,
         created_at=holding.created_at.isoformat(),
         updated_at=holding.updated_at.isoformat()
     )
@@ -272,6 +289,11 @@ async def create_portfolio_holding(
                 detail=str(e)
             )
         
+        # Bestimme Branche: zuerst aus übergebenem Wert, dann aus SECTOR_MAPPING
+        sector = holding.sector
+        if not sector and isin and isin in SECTOR_MAPPING:
+            sector = SECTOR_MAPPING[isin]
+        
         # Erstelle neue Position
         new_holding = PortfolioHolding(
             userId=current_user.id,
@@ -280,7 +302,8 @@ async def create_portfolio_holding(
             name=name,
             purchase_date=purchase_date,
             quantity=quantity_decimal,
-            purchase_price=holding.purchase_price.strip()
+            purchase_price=holding.purchase_price.strip(),
+            sector=sector
         )
         
         db.add(new_holding)
@@ -368,6 +391,8 @@ async def update_portfolio_holding(
             holding.quantity = Decimal(str(holding_update.quantity))
         if holding_update.purchase_price is not None:
             holding.purchase_price = holding_update.purchase_price
+        if holding_update.sector is not None:
+            holding.sector = holding_update.sector
         
         holding.updated_at = datetime.utcnow()
         db.commit()
@@ -538,6 +563,11 @@ async def upload_csv_portfolio(
                 # Normalisiere purchase_price (Komma zu Punkt für Konsistenz, aber speichere Original)
                 purchase_price_normalized = purchase_price.replace(',', '.')
                 
+                # Bestimme Branche aus SECTOR_MAPPING falls vorhanden
+                sector = None
+                if isin and isin in SECTOR_MAPPING:
+                    sector = SECTOR_MAPPING[isin]
+                
                 # Erstelle Position
                 new_holding = PortfolioHolding(
                     userId=current_user.id,
@@ -546,7 +576,8 @@ async def upload_csv_portfolio(
                     name=name,
                     purchase_date=purchase_date,
                     quantity=quantity_decimal,
-                    purchase_price=purchase_price_normalized  # Speichere mit Punkt für Konsistenz
+                    purchase_price=purchase_price_normalized,  # Speichere mit Punkt für Konsistenz
+                    sector=sector
                 )
                 
                 db.add(new_holding)
