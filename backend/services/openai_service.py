@@ -241,7 +241,7 @@ Berücksichtige dabei:
         
         logger.info(f"Rufe OpenAI API auf für Portfolio mit {len(holdings)} Positionen")
         
-        # OpenAI API Call
+        # OpenAI API Call (client wurde bereits oben initialisiert)
         response = client.chat.completions.create(
             model="gpt-4o-mini",  # Verwende gpt-4o-mini für Kostenoptimierung, kann auf gpt-4o geändert werden
             messages=[
@@ -273,6 +273,64 @@ Berücksichtige dabei:
     except Exception as e:
         logger.error(f"Fehler bei OpenAI API Call: {e}")
         raise
+
+
+def parse_percentage_string(value) -> float:
+    """
+    Konvertiert einen Prozent-String (z.B. "70%" oder "14.9%") zu einem float (z.B. 70.0 oder 14.9)
+    
+    Args:
+        value: String mit Prozentzeichen oder bereits ein float/int
+        
+    Returns:
+        Float-Wert (ohne Prozentzeichen)
+    """
+    if isinstance(value, (int, float)):
+        return float(value)
+    
+    if isinstance(value, str):
+        # Entferne Prozentzeichen und Leerzeichen
+        cleaned = value.replace("%", "").strip()
+        try:
+            return float(cleaned)
+        except ValueError:
+            # Fallback: versuche nur Zahlen zu extrahieren
+            import re
+            numbers = re.findall(r'\d+\.?\d*', cleaned)
+            if numbers:
+                return float(numbers[0])
+            return 0.0
+    
+    return 0.0
+
+
+def parse_percentage_string(value) -> float:
+    """
+    Konvertiert einen Prozent-String (z.B. "70%" oder "14.9%") zu einem float (z.B. 70.0 oder 14.9)
+    
+    Args:
+        value: String mit Prozentzeichen oder bereits ein float/int
+        
+    Returns:
+        Float-Wert (ohne Prozentzeichen)
+    """
+    if isinstance(value, (int, float)):
+        return float(value)
+    
+    if isinstance(value, str):
+        # Entferne Prozentzeichen und Leerzeichen
+        cleaned = value.replace("%", "").strip()
+        try:
+            return float(cleaned)
+        except ValueError:
+            # Fallback: versuche nur Zahlen zu extrahieren
+            import re
+            numbers = re.findall(r'\d+\.?\d*', cleaned)
+            if numbers:
+                return float(numbers[0])
+            return 0.0
+    
+    return 0.0
 
 
 def validate_and_normalize_analysis(analysis: Dict, holdings: List[Dict]) -> Dict:
@@ -337,15 +395,30 @@ def validate_and_normalize_analysis(analysis: Dict, holdings: List[Dict]) -> Dic
     if "risks" in analysis and isinstance(analysis["risks"], list):
         normalized["risks"] = analysis["risks"]
     
-    # Diversification
+    # Diversification - konvertiere Prozent-Strings zu floats
     if "diversification" in analysis and isinstance(analysis["diversification"], dict):
         div = analysis["diversification"]
-        if "regionBreakdown" in div:
-            normalized["diversification"]["regionBreakdown"] = div["regionBreakdown"]
-        if "sectorBreakdown" in div:
-            normalized["diversification"]["sectorBreakdown"] = div["sectorBreakdown"]
-        if "positionWeights" in div:
-            normalized["diversification"]["positionWeights"] = div["positionWeights"]
+        
+        # Region Breakdown - konvertiere Strings zu floats
+        if "regionBreakdown" in div and isinstance(div["regionBreakdown"], dict):
+            normalized["diversification"]["regionBreakdown"] = {
+                key: parse_percentage_string(value)
+                for key, value in div["regionBreakdown"].items()
+            }
+        
+        # Sector Breakdown - konvertiere Strings zu floats
+        if "sectorBreakdown" in div and isinstance(div["sectorBreakdown"], dict):
+            normalized["diversification"]["sectorBreakdown"] = {
+                key: parse_percentage_string(value)
+                for key, value in div["sectorBreakdown"].items()
+            }
+        
+        # Position Weights - konvertiere Strings zu floats
+        if "positionWeights" in div and isinstance(div["positionWeights"], dict):
+            normalized["diversification"]["positionWeights"] = {
+                key: parse_percentage_string(value)
+                for key, value in div["positionWeights"].items()
+            }
     
     # Textfelder
     normalized["cashAssessment"] = analysis.get("cashAssessment", "")
