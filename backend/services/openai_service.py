@@ -11,15 +11,51 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# OpenAI Client initialisieren
-# Unterstützt sowohl OPENAI_API_KEY als auch OPENAI_SECRET (für Flexibilität)
-openai_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_SECRET")
-if not openai_api_key:
-    logger.warning("OPENAI_API_KEY oder OPENAI_SECRET nicht gesetzt. OpenAI-Funktionen werden nicht verfügbar sein.")
-else:
-    logger.info("OpenAI API Key gefunden, Client initialisiert")
+# OpenAI Client - Lazy Initialization (wird erst beim ersten Aufruf erstellt)
+_client = None
+_openai_api_key = None
 
-client = OpenAI(api_key=openai_api_key) if openai_api_key else None
+
+def get_openai_client():
+    """
+    Erstellt oder gibt den OpenAI Client zurück (Lazy Loading)
+    """
+    global _client, _openai_api_key
+    
+    if _client is not None:
+        return _client
+    
+    # Unterstützt sowohl OPENAI_API_KEY als auch OPENAI_SECRET (für Flexibilität)
+    _openai_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_SECRET")
+    
+    if not _openai_api_key:
+        logger.warning("OPENAI_API_KEY oder OPENAI_SECRET nicht gesetzt. OpenAI-Funktionen werden nicht verfügbar sein.")
+        return None
+    
+    try:
+        # Initialisiere Client nur mit api_key, keine anderen Parameter
+        # um Kompatibilitätsprobleme zu vermeiden
+        _client = OpenAI(api_key=_openai_api_key)
+        logger.info("OpenAI API Key gefunden, Client initialisiert")
+        return _client
+    except TypeError as e:
+        # Spezielle Behandlung für TypeError - könnte auf Versionsinkompatibilität hindeuten
+        logger.error(f"TypeError bei OpenAI Client-Initialisierung: {e}")
+        logger.error("Dies könnte auf ein Problem mit der OpenAI-Bibliotheksversion hinweisen")
+        try:
+            import openai
+            openai_version = getattr(openai, '__version__', 'Unknown')
+            logger.error(f"OpenAI Bibliothek Version: {openai_version}")
+            logger.error("Bitte prüfen Sie die OpenAI-Bibliotheksversion in requirements.txt")
+        except:
+            pass
+        return None
+    except Exception as e:
+        logger.error(f"Fehler bei OpenAI Client-Initialisierung: {e}")
+        logger.error(f"Fehlertyp: {type(e).__name__}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None
 
 # Standard System Prompt für Portfolio-Analysen
 SYSTEM_PROMPT = """Du bist ein Finanzanalyse-Assistent für ein Portfolio-Management-Tool. 
@@ -177,6 +213,7 @@ async def analyze_portfolio(
         ValueError: Wenn OpenAI API Key nicht gesetzt ist
         Exception: Bei OpenAI API Fehlern
     """
+    client = get_openai_client()
     if not client:
         raise ValueError("OPENAI_API_KEY oder OPENAI_SECRET ist nicht gesetzt. Bitte konfigurieren Sie die OpenAI API in den Environment Variables.")
     

@@ -10,6 +10,6 @@ sqlalchemy==2.0.35
 pymysql==1.1.1
 psycopg2-binary==2.9.10
 cryptography==46.0.3
-openai==1.12.0
+openai>=1.12.0
 
 
