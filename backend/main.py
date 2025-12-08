@@ -72,15 +72,18 @@ async def startup_event():
     try:
         logger.info("Starting up application...")
         init_db()
-        # Prüfe, ob Tabellen existieren
+        # Prüfe, ob alle erwarteten Tabellen existieren
         from sqlalchemy import inspect
         inspector = inspect(engine)
         existing_tables = inspector.get_table_names()
-        if 'users' in existing_tables:
-            logger.info("Database tables exist, application ready.")
+        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings']
+        missing_tables = [table for table in expected_tables if table not in existing_tables]
+        
+        if missing_tables:
+            logger.warning(f"Missing database tables: {', '.join(missing_tables)}")
+            logger.warning("Please run migrate_user_settings.py or create_tables.sql to create missing tables.")
         else:
-            logger.warning("Database tables do not exist. Please create them manually using create_tables.sql")
-            logger.warning("See DATABASE_SETUP.md for instructions.")
+            logger.info("All database tables exist, application ready.")
     except Exception as e:
         logger.warning(f"Could not initialize database: {e}")
         logger.warning("Database tables may already exist or connection failed.")

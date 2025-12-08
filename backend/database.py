@@ -55,18 +55,22 @@ def init_db():
     from sqlalchemy import inspect
     
     try:
-        # Prüfe, ob Tabellen bereits existieren
+        # Prüfe, welche Tabellen bereits existieren
         inspector = inspect(engine)
         existing_tables = inspector.get_table_names()
         
-        # Wenn users-Tabelle existiert, nehmen wir an, dass alle Tabellen existieren
-        if 'users' in existing_tables:
-            print("Database tables already exist, skipping creation.")
-            return
+        # Definiere alle erwarteten Tabellen
+        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings']
+        missing_tables = [table for table in expected_tables if table not in existing_tables]
         
-        # Versuche Tabellen zu erstellen
-        Base.metadata.create_all(bind=engine)
-        print("Database tables created successfully!")
+        if missing_tables:
+            print(f"Creating missing tables: {', '.join(missing_tables)}")
+            # SQLAlchemy's create_all() erstellt nur fehlende Tabellen
+            # und ignoriert bereits existierende
+            Base.metadata.create_all(bind=engine)
+            print("Database tables created/updated successfully!")
+        else:
+            print("All database tables already exist.")
     except Exception as e:
         error_msg = str(e)
         # Bei PostgreSQL-Berechtigungsfehlern: Warnung statt Fehler
@@ -79,7 +83,8 @@ def init_db():
                 inspector = inspect(engine)
                 existing_tables = inspector.get_table_names()
                 if 'users' in existing_tables:
-                    print("Tables already exist, application can continue.")
+                    print("Some tables exist, application can continue.")
+                    print("Note: Missing tables may cause errors. Please run create_tables.sql manually.")
                     return
             except:
                 pass
