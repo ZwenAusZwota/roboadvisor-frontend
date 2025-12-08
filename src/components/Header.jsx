@@ -70,10 +70,38 @@ const Header = () => {
     }
   }, [hoverTimeout])
 
+  // Click-Event Handler für das Schließen des Menüs
+  useEffect(() => {
+    const handleDocumentClick = (e) => {
+      // Prüfe, ob der Klick außerhalb des Menüs war
+      const menuContainer = document.querySelector('.user-menu-container')
+      if (menuContainer && !menuContainer.contains(e.target) && isHovered) {
+        setIsHovered(false)
+        // Lösche Timeout
+        if (hoverTimeout) {
+          clearTimeout(hoverTimeout)
+          setHoverTimeout(null)
+        }
+      }
+    }
+
+    if (isHovered) {
+      document.addEventListener('click', handleDocumentClick)
+    }
+
+    return () => {
+      document.removeEventListener('click', handleDocumentClick)
+    }
+  }, [isHovered, hoverTimeout])
+
   const handleLogout = () => {
     api.logout()
     setUser(null)
     setIsHovered(false)
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout)
+      setHoverTimeout(null)
+    }
     navigate('/')
     // Optional: Seite neu laden
     window.location.reload()
@@ -81,6 +109,10 @@ const Header = () => {
 
   const handleProfileClick = () => {
     setIsHovered(false)
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout)
+      setHoverTimeout(null)
+    }
     navigate('/profile')
   }
 
@@ -97,6 +129,9 @@ const Header = () => {
               <ul className="nav-list">
                 <li><Link to="/" className="nav-link">Home</Link></li>
                 <li><Link to="/contact" className="nav-link">Kontakt</Link></li>
+                {user && (
+                  <li><Link to="/portfolio" className="nav-link">Portfolio</Link></li>
+                )}
                 <li>
                   {loading ? (
                     <span className="nav-link">...</span>
@@ -112,10 +147,10 @@ const Header = () => {
                         setIsHovered(true)
                       }}
                       onMouseLeave={() => {
-                        // Kleiner Delay bevor Menü geschlossen wird
+                        // Timer: Menü bleibt 3 Sekunden sichtbar
                         const timeout = setTimeout(() => {
                           setIsHovered(false)
-                        }, 200) // 200ms Delay
+                        }, 3000) // 3 Sekunden Delay
                         setHoverTimeout(timeout)
                       }}
                     >
@@ -134,10 +169,10 @@ const Header = () => {
                             setIsHovered(true)
                           }}
                           onMouseLeave={() => {
-                            // Kleiner Delay bevor Menü geschlossen wird
+                            // Timer: Menü bleibt 3 Sekunden sichtbar
                             const timeout = setTimeout(() => {
                               setIsHovered(false)
-                            }, 200) // 200ms Delay
+                            }, 3000) // 3 Sekunden Delay
                             setHoverTimeout(timeout)
                           }}
                         >
