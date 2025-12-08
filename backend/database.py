@@ -71,6 +71,10 @@ def init_db():
             print("Database tables created/updated successfully!")
         else:
             print("All database tables already exist.")
+        
+        # Führe Migrationen für bestehende Tabellen aus
+        migrate_add_sector_column()
+        
     except Exception as e:
         error_msg = str(e)
         # Bei PostgreSQL-Berechtigungsfehlern: Warnung statt Fehler
@@ -93,4 +97,56 @@ def init_db():
         else:
             print(f"Error creating database tables: {e}")
             raise
+
+def migrate_add_sector_column():
+    """Fügt die sector-Spalte zur portfolio_holdings Tabelle hinzu, falls sie nicht existiert"""
+    from sqlalchemy import inspect
+    
+    try:
+        inspector = inspect(engine)
+        
+        # Prüfe, ob portfolio_holdings Tabelle existiert
+        if 'portfolio_holdings' not in inspector.get_table_names():
+            print("portfolio_holdings table does not exist. Skipping sector column migration.")
+            return
+        
+        # Prüfe, ob sector-Spalte bereits existiert
+        columns = [col['name'] for col in inspector.get_columns('portfolio_holdings')]
+        
+        if 'sector' not in columns:
+            print("Adding sector column to portfolio_holdings table...")
+            
+            # Bestimme den SQL-Dialekt
+            dialect = engine.dialect.name
+            
+            if dialect == 'postgresql':
+                # PostgreSQL Syntax
+                with engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE portfolio_holdings ADD COLUMN sector VARCHAR(100) NULL'))
+                    conn.commit()
+                print("sector column added successfully to portfolio_holdings table (PostgreSQL).")
+            elif dialect in ['mysql', 'mariadb']:
+                # MySQL/MariaDB Syntax
+                with engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE portfolio_holdings ADD COLUMN sector VARCHAR(100) NULL'))
+                    conn.commit()
+                print("sector column added successfully to portfolio_holdings table (MySQL/MariaDB).")
+            else:
+                print(f"Warning: Unknown database dialect '{dialect}'. Cannot add sector column automatically.")
+                print("Please run migrate_add_sector_to_portfolio.sql manually.")
+        else:
+            print("sector column already exists in portfolio_holdings table.")
+            
+    except Exception as e:
+        error_msg = str(e)
+        # Wenn die Spalte bereits existiert, ist das OK
+        if "duplicate column" in error_msg.lower() or "already exists" in error_msg.lower():
+            print("sector column already exists in portfolio_holdings table.")
+        elif "permission denied" in error_msg.lower() or "insufficientprivilege" in error_msg.lower():
+            print(f"Warning: Cannot add sector column due to insufficient permissions: {e}")
+            print("Please run migrate_add_sector_to_portfolio.sql manually.")
+        else:
+            print(f"Warning: Error checking/adding sector column: {e}")
+            print("The application will continue, but portfolio sector functionality may not work.")
+            print("Please run migrate_add_sector_to_portfolio.sql manually.")
 
