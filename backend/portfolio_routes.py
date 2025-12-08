@@ -12,7 +12,7 @@ from database import get_db
 from models import User, PortfolioHolding
 from auth import get_current_user
 # Importiere OpenAI-Funktionen aus portfolio_analytics
-from portfolio_analytics import get_sectors_from_openai, SECTOR_MAPPING
+from portfolio_analytics import get_classification_from_openai, SECTOR_MAPPING, REGION_MAPPING, ASSET_CLASS_MAPPING
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,8 @@ class PortfolioHoldingCreate(BaseModel):
     quantity: float  # Unterstützt Dezimalzahlen
     purchase_price: str
     sector: Optional[str] = None  # Branche (optional beim Erstellen)
+    region: Optional[str] = None  # Region (optional beim Erstellen)
+    asset_class: Optional[str] = None  # Assetklasse (optional beim Erstellen)
 
 class PortfolioHoldingUpdate(BaseModel):
     isin: Optional[str] = None
@@ -36,6 +38,8 @@ class PortfolioHoldingUpdate(BaseModel):
     quantity: Optional[float] = None
     purchase_price: Optional[str] = None
     sector: Optional[str] = None  # Branche
+    region: Optional[str] = None  # Region
+    asset_class: Optional[str] = None  # Assetklasse
 
 class PortfolioHoldingResponse(BaseModel):
     id: int
@@ -46,6 +50,8 @@ class PortfolioHoldingResponse(BaseModel):
     quantity: float  # Als float für JSON-Serialisierung
     purchase_price: str
     sector: Optional[str] = None  # Branche
+    region: Optional[str] = None  # Region
+    asset_class: Optional[str] = None  # Assetklasse
     created_at: str
     updated_at: str
     
@@ -123,57 +129,77 @@ async def get_portfolio(
     if not holdings:
         return []
     
-    # Prüfe, welche Positionen keine Branchenzuordnung haben
-    # Eine Position hat eine Branche, wenn sie im sector-Feld der DB steht oder in SECTOR_MAPPING ist
-    positions_without_sector = []
-    sectors_from_openai = {}  # Initialisiere als leeres Dict
+    # Prüfe, welche Positionen keine vollständige Klassifizierung haben
+    # Eine Position ist vollständig klassifiziert, wenn sie sector, region und asset_class hat
+    positions_needing_classification = []
     
     for holding in holdings:
-        has_sector = False
-        # Prüfe, ob die Position bereits eine Branche in der Datenbank hat
-        if holding.sector:
-            has_sector = True
-        # Oder prüfe, ob die Position eine Branche in SECTOR_MAPPING hat
-        elif holding.isin and holding.isin in SECTOR_MAPPING:
-            # Wenn in SECTOR_MAPPING gefunden, setze die Branche in der DB
-            holding.sector = SECTOR_MAPPING[holding.isin]
-            has_sector = True
+        needs_classification = False
         
-        if not has_sector:
-            positions_without_sector.append({
+        # Prüfe, ob alle drei Felder fehlen oder unvollständig sind
+        if not holding.sector:
+            # Prüfe, ob in SECTOR_MAPPING vorhanden
+            if holding.isin and holding.isin in SECTOR_MAPPING:
+                holding.sector = SECTOR_MAPPING[holding.isin]
+            else:
+                needs_classification = True
+        
+        if not holding.region:
+            # Prüfe, ob in REGION_MAPPING vorhanden
+            if holding.isin and holding.isin in REGION_MAPPING:
+                holding.region = REGION_MAPPING[holding.isin]
+            else:
+                needs_classification = True
+        
+        if not holding.asset_class:
+            # Prüfe, ob in ASSET_CLASS_MAPPING vorhanden
+            if holding.isin and holding.isin in ASSET_CLASS_MAPPING:
+                holding.asset_class = ASSET_CLASS_MAPPING[holding.isin]
+            else:
+                needs_classification = True
+        
+        if needs_classification:
+            positions_needing_classification.append({
                 'position_id': holding.id,
                 'name': holding.name,
                 'isin': holding.isin,
                 'ticker': holding.ticker
             })
     
-    # Wenn Positionen ohne Branchenzuordnung gefunden wurden, sende sie an OpenAI
-    if positions_without_sector:
-        logger.info(f"Gefunden {len(positions_without_sector)} Positionen ohne Branchenzuordnung für User {current_user.id}. Sende an OpenAI zur Klassifizierung.")
+    # Wenn Positionen ohne vollständige Klassifizierung gefunden wurden, sende sie an OpenAI
+    if positions_needing_classification:
+        logger.info(f"Gefunden {len(positions_needing_classification)} Positionen ohne vollständige Klassifizierung für User {current_user.id}. Sende an OpenAI.")
         try:
-            # Rufe OpenAI auf, um Branchen für die fehlenden Positionen zu bestimmen
-            sectors_from_openai = await get_sectors_from_openai(positions_without_sector)
+            # Rufe OpenAI auf, um Branche, Region und Assetklasse für die fehlenden Positionen zu bestimmen
+            classification_from_openai = await get_classification_from_openai(positions_needing_classification)
             
-            if sectors_from_openai:
-                logger.info(f"OpenAI hat Branchen für {len(sectors_from_openai)} Positionen zurückgegeben")
-                # Speichere Branchenzuordnungen in der Datenbank
-                for position_id, sector in sectors_from_openai.items():
+            if classification_from_openai:
+                logger.info(f"OpenAI hat Klassifizierungen für {len(classification_from_openai)} Positionen zurückgegeben")
+                # Speichere Klassifizierungen in der Datenbank
+                for position_id, classification in classification_from_openai.items():
                     holding = next((h for h in holdings if h.id == position_id), None)
-                    if holding and sector and sector != "Unbekannt":
-                        holding.sector = sector
-                        logger.info(f"Branche '{sector}' für Position {holding.id} ({holding.name}) wird in Datenbank gespeichert")
+                    if holding:
+                        if classification.get("sector") and classification["sector"] != "Unbekannt":
+                            holding.sector = classification["sector"]
+                        if classification.get("region") and classification["region"] != "Unbekannt":
+                            holding.region = classification["region"]
+                        if classification.get("asset_class") and classification["asset_class"] != "Unbekannt":
+                            holding.asset_class = classification["asset_class"]
+                        logger.info(f"Klassifizierung für Position {holding.id} ({holding.name}) gespeichert: "
+                                  f"Sector={classification.get('sector')}, Region={classification.get('region')}, "
+                                  f"AssetClass={classification.get('asset_class')}")
                 
                 # Commit alle Änderungen auf einmal
-                if sectors_from_openai:
+                if classification_from_openai:
                     db.commit()
-                    logger.info(f"{len(sectors_from_openai)} Branchenzuordnungen erfolgreich in Datenbank gespeichert")
+                    logger.info(f"{len(classification_from_openai)} Klassifizierungen erfolgreich in Datenbank gespeichert")
             else:
-                logger.warning("OpenAI hat keine Branchenzuordnungen zurückgegeben")
+                logger.warning("OpenAI hat keine Klassifizierungen zurückgegeben")
         except Exception as e:
             # Fehler bei OpenAI-Aufruf sollte nicht den gesamten Portfolio-Abruf blockieren
-            logger.error(f"Fehler beim Aufruf von OpenAI für Branchenklassifizierung: {e}")
+            logger.error(f"Fehler beim Aufruf von OpenAI für Klassifizierung: {e}")
     else:
-        logger.info(f"Alle {len(holdings)} Positionen des Users {current_user.id} haben eine Branchenzuordnung")
+        logger.info(f"Alle {len(holdings)} Positionen des Users {current_user.id} haben eine vollständige Klassifizierung")
     
     return [
         PortfolioHoldingResponse(
@@ -185,6 +211,8 @@ async def get_portfolio(
             quantity=float(h.quantity) if h.quantity else 0,
             purchase_price=h.purchase_price,
             sector=h.sector,
+            region=h.region,
+            asset_class=h.asset_class,
             created_at=h.created_at.isoformat(),
             updated_at=h.updated_at.isoformat()
         )
@@ -219,6 +247,8 @@ async def get_portfolio_holding(
         quantity=float(holding.quantity) if holding.quantity else 0,
         purchase_price=holding.purchase_price,
         sector=holding.sector,
+        region=holding.region,
+        asset_class=holding.asset_class,
         created_at=holding.created_at.isoformat(),
         updated_at=holding.updated_at.isoformat()
     )
@@ -289,10 +319,18 @@ async def create_portfolio_holding(
                 detail=str(e)
             )
         
-        # Bestimme Branche: zuerst aus übergebenem Wert, dann aus SECTOR_MAPPING
+        # Bestimme Klassifizierung: zuerst aus übergebenem Wert, dann aus Mappings
         sector = holding.sector
         if not sector and isin and isin in SECTOR_MAPPING:
             sector = SECTOR_MAPPING[isin]
+        
+        region = holding.region
+        if not region and isin and isin in REGION_MAPPING:
+            region = REGION_MAPPING[isin]
+        
+        asset_class = holding.asset_class
+        if not asset_class and isin and isin in ASSET_CLASS_MAPPING:
+            asset_class = ASSET_CLASS_MAPPING[isin]
         
         # Erstelle neue Position
         new_holding = PortfolioHolding(
@@ -303,7 +341,9 @@ async def create_portfolio_holding(
             purchase_date=purchase_date,
             quantity=quantity_decimal,
             purchase_price=holding.purchase_price.strip(),
-            sector=sector
+            sector=sector,
+            region=region,
+            asset_class=asset_class
         )
         
         db.add(new_holding)
@@ -320,6 +360,9 @@ async def create_portfolio_holding(
             purchase_date=new_holding.purchase_date.isoformat(),
             quantity=float(new_holding.quantity) if new_holding.quantity else 0,
             purchase_price=new_holding.purchase_price,
+            sector=new_holding.sector,
+            region=new_holding.region,
+            asset_class=new_holding.asset_class,
             created_at=new_holding.created_at.isoformat(),
             updated_at=new_holding.updated_at.isoformat()
         )
@@ -393,6 +436,10 @@ async def update_portfolio_holding(
             holding.purchase_price = holding_update.purchase_price
         if holding_update.sector is not None:
             holding.sector = holding_update.sector
+        if holding_update.region is not None:
+            holding.region = holding_update.region
+        if holding_update.asset_class is not None:
+            holding.asset_class = holding_update.asset_class
         
         holding.updated_at = datetime.utcnow()
         db.commit()
@@ -408,6 +455,9 @@ async def update_portfolio_holding(
             purchase_date=holding.purchase_date.isoformat(),
             quantity=float(holding.quantity) if holding.quantity else 0,
             purchase_price=holding.purchase_price,
+            sector=holding.sector,
+            region=holding.region,
+            asset_class=holding.asset_class,
             created_at=holding.created_at.isoformat(),
             updated_at=holding.updated_at.isoformat()
         )
@@ -563,10 +613,18 @@ async def upload_csv_portfolio(
                 # Normalisiere purchase_price (Komma zu Punkt für Konsistenz, aber speichere Original)
                 purchase_price_normalized = purchase_price.replace(',', '.')
                 
-                # Bestimme Branche aus SECTOR_MAPPING falls vorhanden
+                # Bestimme Klassifizierung aus Mappings falls vorhanden
                 sector = None
                 if isin and isin in SECTOR_MAPPING:
                     sector = SECTOR_MAPPING[isin]
+                
+                region = None
+                if isin and isin in REGION_MAPPING:
+                    region = REGION_MAPPING[isin]
+                
+                asset_class = None
+                if isin and isin in ASSET_CLASS_MAPPING:
+                    asset_class = ASSET_CLASS_MAPPING[isin]
                 
                 # Erstelle Position
                 new_holding = PortfolioHolding(
@@ -577,7 +635,9 @@ async def upload_csv_portfolio(
                     purchase_date=purchase_date,
                     quantity=quantity_decimal,
                     purchase_price=purchase_price_normalized,  # Speichere mit Punkt für Konsistenz
-                    sector=sector
+                    sector=sector,
+                    region=region,
+                    asset_class=asset_class
                 )
                 
                 db.add(new_holding)

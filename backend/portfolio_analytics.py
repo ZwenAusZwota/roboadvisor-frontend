@@ -213,7 +213,115 @@ def get_openai_client() -> Optional[OpenAI]:
         logger.error(f"Fehler beim Erstellen des OpenAI-Clients: {e}")
         return None
 
+async def get_classification_from_openai(positions: List[Dict[str, Any]]) -> Dict[int, Dict[str, str]]:
+    """
+    Fragt die OpenAI-API nach Branche, Region und Assetklasse für alle Portfolio-Positionen auf einmal.
+    
+    Args:
+        positions: Liste von Dictionaries mit position_id, name, isin, ticker
+        
+    Returns:
+        Dictionary mit position_id -> {"sector": "...", "region": "...", "asset_class": "..."}
+    """
+    if not positions:
+        return {}
+    
+    client = get_openai_client()
+    if not client:
+        logger.warning("OpenAI-Client nicht verfügbar, verwende Fallback")
+        return {}
+    
+    try:
+        # Erstelle Prompt für alle Positionen auf einmal
+        positions_info = []
+        for pos in positions:
+            info_parts = [f"Name: {pos['name']}"]
+            if pos.get('isin'):
+                info_parts.append(f"ISIN: {pos['isin']}")
+            if pos.get('ticker'):
+                info_parts.append(f"Ticker: {pos['ticker']}")
+            positions_info.append({
+                "id": pos['position_id'],
+                "info": " | ".join(info_parts)
+            })
+        
+        prompt = (
+            "Bestimme für folgende Wertpapiere die Branche (Sector), Region und Assetklasse. "
+            "Antworte NUR mit einem JSON-Objekt im Format: "
+            '{"position_id": {"sector": "Branche", "region": "Region", "asset_class": "Assetklasse"}, ...}. '
+            "\n\n"
+            "Branchen (deutsch): Technologie, Finanzen, Gesundheitswesen, Konsumgüter, Energie, Industrie, "
+            "Telekommunikation, Immobilien, Basismaterialien, Versorgungsunternehmen, etc.\n"
+            "Regionen (deutsch): Nordamerika, Europa, Asien-Pazifik, Lateinamerika, Naher Osten, Afrika, etc.\n"
+            "Assetklassen (deutsch): Aktien, Anleihen, Fonds, ETFs, Rohstoffe, Immobilien, etc.\n\n"
+            "Falls etwas nicht bestimmt werden kann, verwende 'Unbekannt'.\n\n"
+            "Wertpapiere:\n"
+        )
+        
+        for pos_info in positions_info:
+            prompt += f"- ID {pos_info['id']}: {pos_info['info']}\n"
+        
+        prompt += "\nAntworte NUR mit dem JSON-Objekt, keine weiteren Erklärungen."
+        
+        # Rufe OpenAI API auf
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Kostengünstiges Modell
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Du bist ein Finanzexperte, der Wertpapiere klassifiziert. Antworte nur mit JSON."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.3,  # Niedrige Temperatur für konsistente Ergebnisse
+            response_format={"type": "json_object"}
+        )
+        
+        # Parse Antwort
+        content = response.choices[0].message.content.strip()
+        
+        # Versuche JSON zu parsen
+        try:
+            classification_dict = json.loads(content)
+            # Konvertiere String-Keys zu Integer
+            result = {}
+            for key, value in classification_dict.items():
+                try:
+                    position_id = int(key)
+                    if isinstance(value, dict):
+                        result[position_id] = {
+                            "sector": str(value.get("sector", "Unbekannt")),
+                            "region": str(value.get("region", "Unbekannt")),
+                            "asset_class": str(value.get("asset_class", "Unbekannt"))
+                        }
+                except (ValueError, TypeError):
+                    continue
+            return result
+        except json.JSONDecodeError as e:
+            logger.error(f"Fehler beim Parsen der OpenAI-Antwort: {e}")
+            logger.error(f"Antwort war: {content}")
+            return {}
+            
+    except Exception as e:
+        logger.error(f"Fehler bei OpenAI API-Aufruf: {e}")
+        return {}
+
 async def get_sectors_from_openai(positions: List[Dict[str, Any]]) -> Dict[int, str]:
+    """
+    Fragt die OpenAI-API nach Branchen für alle Portfolio-Positionen auf einmal.
+    DEPRECATED: Verwende stattdessen get_classification_from_openai für alle drei Attribute.
+    
+    Args:
+        positions: Liste von Dictionaries mit position_id, name, isin, ticker
+        
+    Returns:
+        Dictionary mit position_id -> Branche
+    """
+    classification = await get_classification_from_openai(positions)
+    return {pos_id: data.get("sector", "Unbekannt") for pos_id, data in classification.items()}
     """
     Fragt die OpenAI-API nach Branchen für alle Portfolio-Positionen auf einmal.
     
@@ -433,11 +541,11 @@ async def get_portfolio_allocation(
     positions = [calculate_position_value(h) for h in holdings]
     total_value = sum(p.current_value for p in positions if p.current_value) or sum(p.purchase_value for p in positions)
     
-    # Berechne Aufteilung nach Branchen
+    # Berechne Aufteilung nach Branchen (nur echte Daten aus DB)
     sector_values: Dict[str, float] = {}
     for h, p in zip(holdings, positions):
-        # Verwende zuerst Branche aus Datenbank, dann SECTOR_MAPPING, dann "Sonstige"
-        sector = h.sector if h.sector else (SECTOR_MAPPING.get(h.isin, "Sonstige") if h.isin else "Sonstige")
+        # Verwende nur Branche aus Datenbank, "Sonstige" für fehlende
+        sector = h.sector if h.sector else "Sonstige"
         value = p.current_value if p.current_value else p.purchase_value
         sector_values[sector] = sector_values.get(sector, 0) + value
     
@@ -450,11 +558,11 @@ async def get_portfolio_allocation(
         for sector, value in sorted(sector_values.items(), key=lambda x: x[1], reverse=True)
     ]
     
-    # Berechne Aufteilung nach Regionen
+    # Berechne Aufteilung nach Regionen (nur echte Daten aus DB)
     region_values: Dict[str, float] = {}
     for h, p in zip(holdings, positions):
-        isin = h.isin or ""
-        region = REGION_MAPPING.get(isin, "Sonstige")
+        # Verwende nur Region aus Datenbank, "Sonstige" für fehlende
+        region = h.region if h.region else "Sonstige"
         value = p.current_value if p.current_value else p.purchase_value
         region_values[region] = region_values.get(region, 0) + value
     
@@ -467,11 +575,11 @@ async def get_portfolio_allocation(
         for region, value in sorted(region_values.items(), key=lambda x: x[1], reverse=True)
     ]
     
-    # Berechne Aufteilung nach Assetklassen
+    # Berechne Aufteilung nach Assetklassen (nur echte Daten aus DB)
     asset_class_values: Dict[str, float] = {}
     for h, p in zip(holdings, positions):
-        isin = h.isin or ""
-        asset_class = ASSET_CLASS_MAPPING.get(isin, "Sonstige")
+        # Verwende nur Assetklasse aus Datenbank, "Sonstige" für fehlende
+        asset_class = h.asset_class if h.asset_class else "Sonstige"
         value = p.current_value if p.current_value else p.purchase_value
         asset_class_values[asset_class] = asset_class_values.get(asset_class, 0) + value
     

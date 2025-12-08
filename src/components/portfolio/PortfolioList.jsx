@@ -75,6 +75,8 @@ const PortfolioList = ({ refreshTrigger, showSuccess, showError, onRefresh }) =>
               <th>ISIN</th>
               <th>Ticker</th>
               <th>Branche</th>
+              <th>Region</th>
+              <th>Assetklasse</th>
               <th>Kaufdatum</th>
               <th>Anzahl</th>
               <th>Kaufpreis</th>
@@ -88,6 +90,8 @@ const PortfolioList = ({ refreshTrigger, showSuccess, showError, onRefresh }) =>
                 <td>{holding.isin || '-'}</td>
                 <td>{holding.ticker || '-'}</td>
                 <td>{holding.sector || '-'}</td>
+                <td>{holding.region || '-'}</td>
+                <td>{holding.asset_class || '-'}</td>
                 <td>{formatDate(holding.purchase_date)}</td>
                 <td>{holding.quantity}</td>
                 <td>{holding.purchase_price}</td>

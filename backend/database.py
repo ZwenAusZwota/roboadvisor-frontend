@@ -74,6 +74,7 @@ def init_db():
         
         # Führe Migrationen für bestehende Tabellen aus
         migrate_add_sector_column()
+        migrate_add_region_asset_class_columns()
         
     except Exception as e:
         error_msg = str(e)
@@ -149,4 +150,80 @@ def migrate_add_sector_column():
             print(f"Warning: Error checking/adding sector column: {e}")
             print("The application will continue, but portfolio sector functionality may not work.")
             print("Please run migrate_add_sector_to_portfolio.sql manually.")
+
+def migrate_add_region_asset_class_columns():
+    """Fügt die region und asset_class Spalten zur portfolio_holdings Tabelle hinzu, falls sie nicht existieren"""
+    from sqlalchemy import inspect
+    
+    try:
+        inspector = inspect(engine)
+        
+        # Prüfe, ob portfolio_holdings Tabelle existiert
+        if 'portfolio_holdings' not in inspector.get_table_names():
+            print("portfolio_holdings table does not exist. Skipping region/asset_class column migration.")
+            return
+        
+        # Prüfe, welche Spalten bereits existieren
+        columns = [col['name'] for col in inspector.get_columns('portfolio_holdings')]
+        
+        dialect = engine.dialect.name
+        added_any = False
+        
+        # Prüfe und füge region-Spalte hinzu
+        if 'region' not in columns:
+            print("Adding region column to portfolio_holdings table...")
+            try:
+                if dialect == 'postgresql':
+                    with engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE portfolio_holdings ADD COLUMN region VARCHAR(100) NULL'))
+                        conn.commit()
+                    print("region column added successfully (PostgreSQL).")
+                    added_any = True
+                elif dialect in ['mysql', 'mariadb']:
+                    with engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE portfolio_holdings ADD COLUMN region VARCHAR(100) NULL'))
+                        conn.commit()
+                    print("region column added successfully (MySQL/MariaDB).")
+                    added_any = True
+            except Exception as e:
+                error_msg = str(e)
+                if "duplicate column" not in error_msg.lower() and "already exists" not in error_msg.lower():
+                    print(f"Warning: Error adding region column: {e}")
+        else:
+            print("region column already exists in portfolio_holdings table.")
+        
+        # Prüfe und füge asset_class-Spalte hinzu
+        if 'asset_class' not in columns:
+            print("Adding asset_class column to portfolio_holdings table...")
+            try:
+                if dialect == 'postgresql':
+                    with engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE portfolio_holdings ADD COLUMN asset_class VARCHAR(100) NULL'))
+                        conn.commit()
+                    print("asset_class column added successfully (PostgreSQL).")
+                    added_any = True
+                elif dialect in ['mysql', 'mariadb']:
+                    with engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE portfolio_holdings ADD COLUMN asset_class VARCHAR(100) NULL'))
+                        conn.commit()
+                    print("asset_class column added successfully (MySQL/MariaDB).")
+                    added_any = True
+            except Exception as e:
+                error_msg = str(e)
+                if "duplicate column" not in error_msg.lower() and "already exists" not in error_msg.lower():
+                    print(f"Warning: Error adding asset_class column: {e}")
+        else:
+            print("asset_class column already exists in portfolio_holdings table.")
+            
+        if not added_any and 'region' in columns and 'asset_class' in columns:
+            print("region and asset_class columns already exist in portfolio_holdings table.")
+            
+    except Exception as e:
+        error_msg = str(e)
+        if "permission denied" in error_msg.lower() or "insufficientprivilege" in error_msg.lower():
+            print(f"Warning: Cannot add region/asset_class columns due to insufficient permissions: {e}")
+            print("Please run migrate_add_region_asset_class.sql manually.")
+        else:
+            print(f"Warning: Error checking/adding region/asset_class columns: {e}")
+            print("Please run migrate_add_region_asset_class.sql manually.")
 

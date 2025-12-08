@@ -55,6 +55,8 @@ class PortfolioHolding(Base):
     quantity = Column(Numeric(15, 6), nullable=False)  # Anzahl (unterstützt Dezimalzahlen)
     purchase_price = Column(String(50), nullable=False)  # Kaufpreis (als String für Flexibilität)
     sector = Column(String(100), nullable=True)  # Branche (z.B. Technologie, Finanzen, etc.)
+    region = Column(String(100), nullable=True)  # Region (z.B. Nordamerika, Europa, etc.)
+    asset_class = Column(String(100), nullable=True)  # Assetklasse (z.B. Aktien, Anleihen, etc.)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     
