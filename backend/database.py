@@ -51,7 +51,7 @@ def get_db():
 # Helper function für init_db
 def init_db():
     """Erstellt alle Tabellen in der Datenbank"""
-    from models import User, RiskProfile, Security, TelegramUser
+    from models import User, RiskProfile, Security, TelegramUser, UserSettings
     from sqlalchemy import inspect
     
     try:

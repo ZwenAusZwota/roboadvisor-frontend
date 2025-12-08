@@ -159,6 +159,83 @@ class ApiService {
   async healthCheck() {
     return this.request('/api/health')
   }
+
+  // User Profile Endpoints
+  async getUserProfile() {
+    return this.request('/api/user/profile')
+  }
+
+  async updateUserProfile(profileData) {
+    return this.request('/api/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    })
+  }
+
+  // User Settings Endpoints
+  async getUserSettings() {
+    return this.request('/api/user/settings')
+  }
+
+  async updateUserSettings(settingsData) {
+    return this.request('/api/user/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settingsData),
+    })
+  }
+
+  // Security Endpoints
+  async changePassword(currentPassword, newPassword) {
+    return this.request('/api/user/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    })
+  }
+
+  async setup2FA(enable, password) {
+    return this.request('/api/user/2fa/setup', {
+      method: 'POST',
+      body: JSON.stringify({
+        enable,
+        password,
+      }),
+    })
+  }
+
+  // Privacy Endpoints
+  async exportUserData() {
+    const response = await fetch(`${this.baseURL}/api/user/data-export`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Fehler beim Exportieren der Daten')
+    }
+
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `user_data_${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  }
+
+  async deleteAccount() {
+    return this.request('/api/user', {
+      method: 'DELETE',
+    })
+  }
 }
 
 export default new ApiService()

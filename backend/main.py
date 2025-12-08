@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 # Database imports
 from database import get_db, init_db, engine
-from models import User
+from models import User, UserSettings
+from user_routes import router as user_router
 
 # Konfiguration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
@@ -331,6 +332,7 @@ async def global_exception_handler(request, exc):
 
 # Router zur App hinzufügen
 app.include_router(api_router)
+app.include_router(user_router)
 
 if __name__ == "__main__":
     import uvicorn
