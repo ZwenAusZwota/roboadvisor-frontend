@@ -132,7 +132,7 @@ const ManualEntry = ({ showSuccess, showError, onSuccess }) => {
     const holdingData = {
       name: formData.name.trim(),
       purchase_date: purchaseDate,
-      quantity: parseInt(formData.quantity),
+      quantity: parseFloat(formData.quantity) || 0,
       purchase_price: formData.purchase_price.trim(),
     }
 
@@ -289,10 +289,11 @@ const ManualEntry = ({ showSuccess, showError, onSuccess }) => {
               value={formData.quantity}
               onChange={handleChange}
               required
-              min="1"
-              step="1"
+              min="0.000001"
+              step="0.000001"
               placeholder="10"
             />
+            <small>Unterstützt Dezimalzahlen (z.B. 11.532)</small>
           </div>
         </div>
 

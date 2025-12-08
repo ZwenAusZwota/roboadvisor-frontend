@@ -72,14 +72,18 @@ const CSVUpload = ({ showSuccess, showError, onSuccess }) => {
         </p>
         <ul>
           <li><strong>name</strong> (erforderlich) - Name des Wertpapiers</li>
-          <li><strong>purchase_date</strong> (erforderlich) - Kaufdatum (Format: YYYY-MM-DD)</li>
-          <li><strong>quantity</strong> (erforderlich) - Anzahl</li>
-          <li><strong>purchase_price</strong> (erforderlich) - Kaufpreis pro Stück</li>
+          <li><strong>purchase_date</strong> (erforderlich) - Kaufdatum (Format: YYYY-MM-DD, DD.MM.YYYY oder DD/MM/YYYY)</li>
+          <li><strong>quantity</strong> (erforderlich) - Anzahl (unterstützt Dezimalzahlen, z.B. 11.532 oder 11,532)</li>
+          <li><strong>purchase_price</strong> (erforderlich) - Kaufpreis pro Stück (z.B. 215.35 oder 215,35)</li>
           <li><strong>isin</strong> (optional) - ISIN (12 Zeichen)</li>
           <li><strong>ticker</strong> (optional) - Ticker-Symbol</li>
         </ul>
         <p className="csv-note">
           <strong>Hinweis:</strong> ISIN oder Ticker muss mindestens angegeben werden.
+        </p>
+        <p className="csv-note">
+          <strong>Trennzeichen:</strong> Die CSV-Datei kann Komma (,) oder Semikolon (;) als Trennzeichen verwenden.
+          Dezimalzahlen können sowohl mit Punkt (.) als auch mit Komma (,) eingegeben werden.
         </p>
       </div>
 

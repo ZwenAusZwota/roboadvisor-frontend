@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON, Numeric
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -52,7 +52,7 @@ class PortfolioHolding(Base):
     ticker = Column(String(20), nullable=True)  # Ticker-Symbol
     name = Column(String(255), nullable=False)  # Name des Wertpapiers
     purchase_date = Column(DateTime, nullable=False)  # Kaufdatum
-    quantity = Column(Integer, nullable=False)  # Anzahl
+    quantity = Column(Numeric(15, 6), nullable=False)  # Anzahl (unterstützt Dezimalzahlen)
     purchase_price = Column(String(50), nullable=False)  # Kaufpreis (als String für Flexibilität)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

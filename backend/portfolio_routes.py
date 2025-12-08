@@ -22,7 +22,7 @@ class PortfolioHoldingCreate(BaseModel):
     ticker: Optional[str] = None
     name: str
     purchase_date: str  # ISO format string
-    quantity: int
+    quantity: float  # Unterstützt Dezimalzahlen
     purchase_price: str
 
 class PortfolioHoldingUpdate(BaseModel):
@@ -30,7 +30,7 @@ class PortfolioHoldingUpdate(BaseModel):
     ticker: Optional[str] = None
     name: Optional[str] = None
     purchase_date: Optional[str] = None
-    quantity: Optional[int] = None
+    quantity: Optional[float] = None
     purchase_price: Optional[str] = None
 
 class PortfolioHoldingResponse(BaseModel):
@@ -39,7 +39,7 @@ class PortfolioHoldingResponse(BaseModel):
     ticker: Optional[str]
     name: str
     purchase_date: str
-    quantity: int
+    quantity: float  # Als float für JSON-Serialisierung
     purchase_price: str
     created_at: str
     updated_at: str
@@ -118,7 +118,7 @@ async def get_portfolio(
             ticker=h.ticker,
             name=h.name,
             purchase_date=h.purchase_date.isoformat(),
-            quantity=h.quantity,
+            quantity=float(h.quantity) if h.quantity else 0,
             purchase_price=h.purchase_price,
             created_at=h.created_at.isoformat(),
             updated_at=h.updated_at.isoformat()
@@ -151,7 +151,7 @@ async def get_portfolio_holding(
         ticker=holding.ticker,
         name=holding.name,
         purchase_date=holding.purchase_date.isoformat(),
-        quantity=holding.quantity,
+        quantity=float(holding.quantity) if holding.quantity else 0,
         purchase_price=holding.purchase_price,
         created_at=holding.created_at.isoformat(),
         updated_at=holding.updated_at.isoformat()
@@ -198,6 +198,10 @@ async def create_portfolio_holding(
                 detail="Anzahl muss größer als 0 sein"
             )
         
+        # Konvertiere quantity zu Decimal für Datenbank
+        from decimal import Decimal
+        quantity_decimal = Decimal(str(holding.quantity))
+        
         if not holding.purchase_price or not holding.purchase_price.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -226,7 +230,7 @@ async def create_portfolio_holding(
             ticker=ticker.upper() if ticker else None,
             name=name,
             purchase_date=purchase_date,
-            quantity=holding.quantity,
+            quantity=quantity_decimal,
             purchase_price=holding.purchase_price.strip()
         )
         
@@ -242,7 +246,7 @@ async def create_portfolio_holding(
             ticker=new_holding.ticker,
             name=new_holding.name,
             purchase_date=new_holding.purchase_date.isoformat(),
-            quantity=new_holding.quantity,
+            quantity=float(new_holding.quantity) if new_holding.quantity else 0,
             purchase_price=new_holding.purchase_price,
             created_at=new_holding.created_at.isoformat(),
             updated_at=new_holding.updated_at.isoformat()
@@ -311,7 +315,8 @@ async def update_portfolio_holding(
                     detail=str(e)
                 )
         if holding_update.quantity is not None:
-            holding.quantity = holding_update.quantity
+            from decimal import Decimal
+            holding.quantity = Decimal(str(holding_update.quantity))
         if holding_update.purchase_price is not None:
             holding.purchase_price = holding_update.purchase_price
         
@@ -327,7 +332,7 @@ async def update_portfolio_holding(
             ticker=holding.ticker,
             name=holding.name,
             purchase_date=holding.purchase_date.isoformat(),
-            quantity=holding.quantity,
+            quantity=float(holding.quantity) if holding.quantity else 0,
             purchase_price=holding.purchase_price,
             created_at=holding.created_at.isoformat(),
             updated_at=holding.updated_at.isoformat()
@@ -393,7 +398,13 @@ async def upload_csv_portfolio(
         # Lese CSV-Datei
         contents = await file.read()
         text = contents.decode('utf-8-sig')  # utf-8-sig entfernt BOM falls vorhanden
-        csv_reader = csv.DictReader(io.StringIO(text))
+        
+        # Erkenne Trennzeichen (Semikolon oder Komma)
+        # Prüfe erste Zeile auf Semikolon
+        first_line = text.split('\n')[0] if '\n' in text else text
+        delimiter = ';' if ';' in first_line else ','
+        
+        csv_reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
         
         # Erwartete Spalten
         required_columns = ['name', 'purchase_date', 'quantity', 'purchase_price']
@@ -406,12 +417,16 @@ async def upload_csv_portfolio(
                 detail="CSV-Datei ist leer oder hat keinen Header"
             )
         
+        # Normalisiere Spaltennamen (trim whitespace)
+        normalized_fieldnames = {name.strip(): name for name in csv_reader.fieldnames}
+        csv_reader.fieldnames = list(normalized_fieldnames.keys())
+        
         # Prüfe ob alle erforderlichen Spalten vorhanden sind
         missing_columns = [col for col in required_columns if col not in csv_reader.fieldnames]
         if missing_columns:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Fehlende Spalten in CSV: {', '.join(missing_columns)}. Erforderlich: {', '.join(required_columns)}"
+                detail=f"Fehlende Spalten in CSV: {', '.join(missing_columns)}. Erforderlich: {', '.join(required_columns)}. Gefundene Spalten: {', '.join(csv_reader.fieldnames)}"
             )
         
         # Verarbeite jede Zeile
@@ -453,11 +468,16 @@ async def upload_csv_portfolio(
                     errors.append(f"Zeile {row_num}: {str(e)}")
                     continue
                 
+                # Parse quantity - unterstützt Komma als Dezimaltrennzeichen
                 try:
-                    quantity = int(quantity_str)
+                    # Ersetze Komma durch Punkt für Python float parsing
+                    quantity_str_normalized = quantity_str.replace(',', '.')
+                    quantity = float(quantity_str_normalized)
                     if quantity <= 0:
                         errors.append(f"Zeile {row_num}: Anzahl muss größer als 0 sein")
                         continue
+                    from decimal import Decimal
+                    quantity_decimal = Decimal(str(quantity))
                 except ValueError:
                     errors.append(f"Zeile {row_num}: Ungültige Anzahl: {quantity_str}")
                     continue
@@ -466,6 +486,9 @@ async def upload_csv_portfolio(
                     errors.append(f"Zeile {row_num}: Ungültiges ISIN-Format: {isin}")
                     continue
                 
+                # Normalisiere purchase_price (Komma zu Punkt für Konsistenz, aber speichere Original)
+                purchase_price_normalized = purchase_price.replace(',', '.')
+                
                 # Erstelle Position
                 new_holding = PortfolioHolding(
                     userId=current_user.id,
@@ -473,8 +496,8 @@ async def upload_csv_portfolio(
                     ticker=ticker.upper() if ticker else None,
                     name=name,
                     purchase_date=purchase_date,
-                    quantity=quantity,
-                    purchase_price=purchase_price
+                    quantity=quantity_decimal,
+                    purchase_price=purchase_price_normalized  # Speichere mit Punkt für Konsistenz
                 )
                 
                 db.add(new_holding)
@@ -516,9 +539,11 @@ async def upload_csv_portfolio(
 @router.get("/api/portfolio/csv-template")
 async def get_csv_template():
     """Lade CSV-Template herunter"""
-    template = "name,purchase_date,quantity,purchase_price,isin,ticker\n"
-    template += "Apple Inc.,2024-01-15,10,150.50,US0378331005,AAPL\n"
-    template += "Microsoft Corporation,2024-02-20,5,380.25,US5949181045,MSFT\n"
+    # Template mit Semikolon als Trennzeichen (deutsches Format)
+    template = "name;purchase_date;quantity;purchase_price;isin;ticker\n"
+    template += "Apple Inc.;2024-01-15;10;150.50;US0378331005;AAPL\n"
+    template += "Microsoft Corporation;2024-02-20;5;380.25;US5949181045;MSFT\n"
+    template += "BASF;2024-01-01;11.532;77.0855;DE000BASF111;\n"
     
     from fastapi.responses import Response
     return Response(
