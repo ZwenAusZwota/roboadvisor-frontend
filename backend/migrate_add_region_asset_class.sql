@@ -15,3 +15,5 @@ COMMENT 'Assetklasse des Wertpapiers (z.B. Aktien, Anleihen, etc.)';
 
 
 
+
+

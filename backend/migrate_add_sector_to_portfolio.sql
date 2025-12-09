@@ -12,3 +12,5 @@ COMMENT 'Branche des Wertpapiers (z.B. Technologie, Finanzen, etc.)';
 
 
 
+
+

@@ -22,3 +22,5 @@ CREATE INDEX IF NOT EXISTS ix_user_settings_userId ON user_settings("userId");
 
 
 
+
+

@@ -156,14 +156,11 @@ async def analyze_watchlist(
         results = []
         
         for item in items:
-            # Prüfe Cache
-            cache_key = f"watchlist_{item.id}"
+            # Prüfe Cache (für einzelnes Item)
             cached_analysis = None
             if not request.force_refresh:
-                cached_analysis = cache_service.get(current_user.id)
-                # Cache-Struktur anpassen für Watchlist
-                if cached_analysis and isinstance(cached_analysis, dict):
-                    cached_analysis = cached_analysis.get(cache_key)
+                # Verwende item.id als portfolio_id-Parameter für eindeutigen Cache-Key
+                cached_analysis = cache_service.get(current_user.id, portfolio_id=item.id, cache_type="watchlist")
             
             if cached_analysis:
                 logger.info(f"Cache Hit für Watchlist-Item {item.id}")
@@ -191,7 +188,14 @@ async def analyze_watchlist(
             
             # Rufe OpenAI Service auf
             logger.info(f"Starte AI-Analyse für Watchlist-Item {item.id}: {item.name}")
-            analysis = await analyze_single_asset(asset_dict, user_settings)
+            try:
+                analysis = await analyze_single_asset(asset_dict, user_settings)
+            except Exception as e:
+                logger.error(f"Fehler bei OpenAI-Analyse für Item {item.id}: {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Fehler bei der KI-Analyse für {item.name}: {str(e)}"
+                )
             
             # Speichere in Historie
             history_entry = AnalysisHistory(
@@ -210,8 +214,14 @@ async def analyze_watchlist(
             )
             db.add(history_entry)
             
-            # Cache setzen (vereinfacht - für einzelne Items)
-            # Für bessere Cache-Implementierung sollte ein separates Cache-Key-System verwendet werden
+            # Cache setzen für dieses Item
+            cache_data = {
+                "fundamentalAnalysis": analysis.get("fundamentalAnalysis"),
+                "technicalAnalysis": analysis.get("technicalAnalysis"),
+                "analysisDate": datetime.utcnow().isoformat()
+            }
+            cache_service.set(current_user.id, cache_data, portfolio_id=item.id, cache_type="watchlist")
+            logger.info(f"Cache gespeichert für Watchlist-Item {item.id}")
             
             results.append(WatchlistAnalysisResponse(
                 item_id=item.id,
