@@ -12,7 +12,7 @@ from datetime import datetime
 from database import get_db
 from models import User, WatchlistItem, UserSettings, AnalysisHistory
 from auth import get_current_user
-# analyze_single_asset wird unten definiert
+from services.openai_service import analyze_single_asset
 from services.cache_service import cache_service
 
 logger = logging.getLogger(__name__)
@@ -33,78 +33,6 @@ class WatchlistAnalysisResponse(BaseModel):
     technicalAnalysis: Optional[Dict[str, Any]]
     analysis_date: str
     cached: bool = False
-
-
-async def analyze_single_asset(asset: Dict, user_settings: Optional[Dict] = None) -> Dict[str, Any]:
-    """
-    Analysiert ein einzelnes Asset (für Watchlist)
-    
-    Args:
-        asset: Asset-Daten (name, isin, ticker, etc.)
-        user_settings: Benutzereinstellungen
-        
-    Returns:
-        Analyse für das einzelne Asset
-    """
-    import json
-    from services.openai_service import get_openai_client, SYSTEM_PROMPT
-    
-    client = get_openai_client()
-    if not client:
-        raise ValueError("OpenAI Client konnte nicht initialisiert werden.")
-    
-    # Baue Kontext für einzelnes Asset
-    asset_context = f"""Asset-Informationen:
-- Name: {asset.get('name', 'Unbekannt')}
-- ISIN: {asset.get('isin', 'N/A')}
-- Ticker: {asset.get('ticker', 'N/A')}
-- Branche: {asset.get('sector', 'Nicht angegeben')}
-- Region: {asset.get('region', 'Nicht angegeben')}
-- Assetklasse: {asset.get('asset_class', 'Nicht angegeben')}
-"""
-    
-    user_prompt = f"""Analysiere das folgende Asset:
-
-{asset_context}
-
-Gib eine detaillierte Analyse zurück mit:
-- Fundamentaler Bewertung (summary, valuation: fair/undervalued/overvalued)
-- Technischer Analyse (trend, rsi, signal: buy/hold/sell)
-- Kurzer Einschätzung der Investitionsattraktivität
-
-Format (JSON):
-{{
-  "fundamentalAnalysis": {{
-    "ticker": "{asset.get('ticker') or asset.get('isin') or asset.get('name')}",
-    "summary": "...",
-    "valuation": "fair"
-  }},
-  "technicalAnalysis": {{
-    "ticker": "{asset.get('ticker') or asset.get('isin') or asset.get('name')}",
-    "trend": "...",
-    "rsi": "...",
-    "signal": "buy/hold/sell"
-  }}
-}}"""
-    
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.7,
-            response_format={"type": "json_object"}
-        )
-        
-        content = response.choices[0].message.content
-        analysis = json.loads(content)
-        
-        return analysis
-    except Exception as e:
-        logger.error(f"Fehler bei OpenAI API Call für Asset-Analyse: {e}")
-        raise
 
 
 # POST /api/watchlist/analyze
@@ -169,8 +97,8 @@ async def analyze_watchlist(
                     asset_name=item.name,
                     asset_isin=item.isin,
                     asset_ticker=item.ticker,
-                    fundamentalAnalysis=cached_analysis.get("fundamentalAnalysis"),
-                    technicalAnalysis=cached_analysis.get("technicalAnalysis"),
+                    fundamentalAnalysis=cached_analysis.get("fundamentalAnalysis", {}),
+                    technicalAnalysis=cached_analysis.get("technicalAnalysis", {}),
                     analysis_date=cached_analysis.get("analysisDate", datetime.utcnow().isoformat()),
                     cached=True
                 ))
@@ -197,6 +125,9 @@ async def analyze_watchlist(
                     detail=f"Fehler bei der KI-Analyse für {item.name}: {str(e)}"
                 )
             
+            # Die analyze_single_asset Funktion gibt bereits ein normalisiertes Dict zurück
+            # mit fundamentalAnalysis und technicalAnalysis als Dicts (nicht Arrays)
+            
             # Speichere in Historie
             history_entry = AnalysisHistory(
                 userId=current_user.id,
@@ -206,8 +137,11 @@ async def analyze_watchlist(
                 asset_isin=item.isin,
                 asset_ticker=item.ticker,
                 analysis_data={
-                    "fundamentalAnalysis": analysis.get("fundamentalAnalysis"),
-                    "technicalAnalysis": analysis.get("technicalAnalysis"),
+                    "fundamentalAnalysis": analysis.get("fundamentalAnalysis", {}),
+                    "technicalAnalysis": analysis.get("technicalAnalysis", {}),
+                    "risks": analysis.get("risks", []),
+                    "recommendation": analysis.get("recommendation", ""),
+                    "priceTarget": analysis.get("priceTarget"),
                     "watchlistAnalysis": True,
                     "analysisDate": datetime.utcnow().isoformat()
                 }
@@ -216,8 +150,8 @@ async def analyze_watchlist(
             
             # Cache setzen für dieses Item
             cache_data = {
-                "fundamentalAnalysis": analysis.get("fundamentalAnalysis"),
-                "technicalAnalysis": analysis.get("technicalAnalysis"),
+                "fundamentalAnalysis": analysis.get("fundamentalAnalysis", {}),
+                "technicalAnalysis": analysis.get("technicalAnalysis", {}),
                 "analysisDate": datetime.utcnow().isoformat()
             }
             cache_service.set(current_user.id, cache_data, portfolio_id=item.id, cache_type="watchlist")
@@ -228,8 +162,8 @@ async def analyze_watchlist(
                 asset_name=item.name,
                 asset_isin=item.isin,
                 asset_ticker=item.ticker,
-                fundamentalAnalysis=analysis.get("fundamentalAnalysis"),
-                technicalAnalysis=analysis.get("technicalAnalysis"),
+                fundamentalAnalysis=analysis.get("fundamentalAnalysis", {}),
+                technicalAnalysis=analysis.get("technicalAnalysis", {}),
                 analysis_date=datetime.utcnow().isoformat(),
                 cached=False
             ))
