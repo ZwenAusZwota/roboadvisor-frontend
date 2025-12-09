@@ -11,16 +11,16 @@ import time
 import asyncio
 
 # Füge das Backend-Verzeichnis zum Python-Pfad hinzu
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+backend_path = os.path.join(os.path.dirname(__file__), '..', 'backend')
+sys.path.insert(0, backend_path)
 
 from database import SessionLocal, engine
-from models import User, PortfolioHolding, WatchlistItem, UserSettings
+from models import User, PortfolioHolding, WatchlistItem, UserSettings, AnalysisHistory
 from services.openai_service import analyze_portfolio, analyze_single_asset
 from services.cache_service import cache_service
-from models import AnalysisHistory
 
 # Logging konfigurieren
-log_file_path = os.path.join(os.path.dirname(__file__), '..', 'daily_analysis_job.log')
+log_file_path = os.path.join(os.path.dirname(__file__), 'daily_analysis_job.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -70,7 +70,7 @@ def has_recent_analysis(db, user_id: int, portfolio_holding_id: int = None, watc
     return query.first() is not None
 
 
-async def analyze_user_portfolio(db, user: User, user_settings: Dict) -> Dict:
+async def analyze_user_portfolio(db, user: User, user_settings: Dict, total_analyses_counter: Dict = None) -> Dict:
     """
     Analysiert das Portfolio eines Benutzers
     """
@@ -84,10 +84,15 @@ async def analyze_user_portfolio(db, user: User, user_settings: Dict) -> Dict:
             logger.info(f"User {user.id} ({user.email}) hat kein Portfolio")
             return {"success": False, "reason": "no_holdings"}
         
+        # Prüfe Safety Limit (wenn Counter übergeben wurde)
+        if total_analyses_counter and total_analyses_counter["count"] >= MAX_ANALYSES_PER_DAY:
+            logger.warning(f"Maximales Analysen-Limit erreicht. Überspringe Portfolio-Analyse für User {user.id}.")
+            return {"success": False, "reason": "limit_reached"}
+        
         # Prüfe, ob bereits eine Analyse in den letzten Stunden existiert
         # (Prüfe für die erste Position als Indikator)
         if has_recent_analysis(db, user.id, portfolio_holding_id=holdings[0].id):
-            logger.info(f"User {user.id} hat bereits eine kürzliche Portfolio-Analyse, überspringe")
+            logger.info(f"User {user.id} hat bereits eine kürzliche Portfolio-Analyse (innerhalb der letzten {SKIP_RECENT_ANALYSES_HOURS} Stunden), überspringe")
             return {"success": False, "reason": "recent_analysis_exists"}
         
         # Konvertiere Holdings zu Dict-Format
@@ -135,7 +140,7 @@ async def analyze_user_portfolio(db, user: User, user_settings: Dict) -> Dict:
             else:
                 analysis_data["fundamentalAnalysis"] = {
                     "ticker": ticker_match,
-                    "summary": "Keine detaillierte fundamentale Analyse verfügbar.",
+                    "summary": "Keine detaillierte fundamentale Analyse verfügbar für diese Position.",
                     "valuation": "fair"
                 }
             
@@ -178,7 +183,7 @@ async def analyze_user_portfolio(db, user: User, user_settings: Dict) -> Dict:
         return {"success": False, "reason": "error", "error": str(e)}
 
 
-async def analyze_user_watchlist(db, user: User, user_settings: Dict) -> Dict:
+async def analyze_user_watchlist(db, user: User, user_settings: Dict, total_analyses_counter: Dict) -> Dict:
     """
     Analysiert die Watchlist eines Benutzers
     """
@@ -208,7 +213,6 @@ async def analyze_user_watchlist(db, user: User, user_settings: Dict) -> Dict:
                 continue
             
             try:
-                
                 # Konvertiere Item zu Dict
                 asset_dict = {
                     "name": item.name,
@@ -252,7 +256,8 @@ async def analyze_user_watchlist(db, user: User, user_settings: Dict) -> Dict:
                 logger.info(f"Watchlist-Item {item.id} erfolgreich analysiert")
                 
                 # Rate Limiting: Warte zwischen einzelnen Analysen
-                if analyzed_count < len(items):
+                # (Nur wenn nicht das letzte Item und Limit nicht erreicht)
+                if analyzed_count < len(items) - skipped_count:
                     await asyncio.sleep(DELAY_BETWEEN_ANALYSES)
                     
             except Exception as e:
@@ -512,4 +517,3 @@ async def main():
 if __name__ == "__main__":
     # Führe das Hauptprogramm aus
     asyncio.run(main())
-
