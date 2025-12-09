@@ -88,43 +88,120 @@ const AnalysisHistoryModal = ({
 
           {!loading && !error && history.length > 0 && (
             <div className="history-timeline">
-              {history.map((entry, index) => (
-                <div key={entry.id} className="history-entry">
-                  <div className="history-date">{formatDate(entry.created_at)}</div>
-                  
-                  {entry.analysis_data?.fundamentalAnalysis && (
-                    <div className="history-section">
-                      <h4>Fundamentale Analyse</h4>
-                      <p>{entry.analysis_data.fundamentalAnalysis.summary}</p>
-                      <div className={`valuation-badge valuation-${entry.analysis_data.fundamentalAnalysis.valuation || 'fair'}`}>
-                        Bewertung: {entry.analysis_data.fundamentalAnalysis.valuation || 'fair'}
+              {history.map((entry, index) => {
+                const fa = entry.analysis_data?.fundamentalAnalysis
+                const ta = entry.analysis_data?.technicalAnalysis
+                const hasData = fa || ta || entry.analysis_data?.recommendation || entry.analysis_data?.risks?.length > 0
+                
+                return (
+                  <div key={entry.id || index} className="history-entry">
+                    <div className="history-date">{formatDate(entry.created_at)}</div>
+                    
+                    {!hasData && (
+                      <div className="history-section">
+                        <p className="history-no-data">Keine detaillierten Analysedaten verfügbar für diesen Eintrag.</p>
                       </div>
-                    </div>
-                  )}
+                    )}
+                    
+                    {fa && typeof fa === 'object' && (
+                      <div className="history-section">
+                        <h4>Fundamentale Analyse</h4>
+                        {fa.summary && <p>{fa.summary}</p>}
+                        {fa.valuation && (
+                          <div className={`valuation-badge valuation-${fa.valuation || 'fair'}`}>
+                            Bewertung: {fa.valuation}
+                          </div>
+                        )}
+                        {fa.strengths && Array.isArray(fa.strengths) && fa.strengths.length > 0 && (
+                          <div className="history-list">
+                            <strong>Stärken:</strong>
+                            <ul>
+                              {fa.strengths.map((strength, i) => (
+                                <li key={i}>{strength}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {fa.weaknesses && Array.isArray(fa.weaknesses) && fa.weaknesses.length > 0 && (
+                          <div className="history-list">
+                            <strong>Schwächen:</strong>
+                            <ul>
+                              {fa.weaknesses.map((weakness, i) => (
+                                <li key={i}>{weakness}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                  {entry.analysis_data?.technicalAnalysis && (
-                    <div className="history-section">
-                      <h4>Technische Analyse</h4>
-                      <div className="technical-details">
-                        <div className="detail-item">
-                          <span className="detail-label">Trend:</span>
-                          <span className="detail-value">{entry.analysis_data.technicalAnalysis.trend || 'N/A'}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">RSI:</span>
-                          <span className="detail-value">{entry.analysis_data.technicalAnalysis.rsi || 'N/A'}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Signal:</span>
-                          <span className={`detail-value signal signal-${entry.analysis_data.technicalAnalysis.signal?.toLowerCase() || 'hold'}`}>
-                            {entry.analysis_data.technicalAnalysis.signal || 'hold'}
-                          </span>
+                    {ta && typeof ta === 'object' && (
+                      <div className="history-section">
+                        <h4>Technische Analyse</h4>
+                        <div className="technical-details">
+                          {ta.trend && (
+                            <div className="detail-item">
+                              <span className="detail-label">Trend:</span>
+                              <span className="detail-value">{ta.trend}</span>
+                            </div>
+                          )}
+                          {ta.rsi && (
+                            <div className="detail-item">
+                              <span className="detail-label">RSI:</span>
+                              <span className="detail-value">{ta.rsi}</span>
+                            </div>
+                          )}
+                          {ta.signal && (
+                            <div className="detail-item">
+                              <span className="detail-label">Signal:</span>
+                              <span className={`detail-value signal signal-${ta.signal.toLowerCase() || 'hold'}`}>
+                                {ta.signal}
+                              </span>
+                            </div>
+                          )}
+                          {ta.supportLevel && (
+                            <div className="detail-item">
+                              <span className="detail-label">Support:</span>
+                              <span className="detail-value">{ta.supportLevel}</span>
+                            </div>
+                          )}
+                          {ta.resistanceLevel && (
+                            <div className="detail-item">
+                              <span className="detail-label">Resistance:</span>
+                              <span className="detail-value">{ta.resistanceLevel}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+
+                    {entry.analysis_data?.risks && Array.isArray(entry.analysis_data.risks) && entry.analysis_data.risks.length > 0 && (
+                      <div className="history-section">
+                        <h4>Risiken</h4>
+                        <ul className="history-risk-list">
+                          {entry.analysis_data.risks.map((risk, i) => (
+                            <li key={i}>{risk}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {entry.analysis_data?.recommendation && (
+                      <div className="history-section">
+                        <h4>Empfehlung</h4>
+                        <p>{entry.analysis_data.recommendation}</p>
+                      </div>
+                    )}
+
+                    {entry.analysis_data?.priceTarget && (
+                      <div className="history-section">
+                        <h4>Preisziel</h4>
+                        <p>{entry.analysis_data.priceTarget}</p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

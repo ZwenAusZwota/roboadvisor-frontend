@@ -189,6 +189,56 @@ async def analyze_portfolio_endpoint(
         
         # Speichere Analyse-Historie für jede Portfolio-Position
         for holding in holdings:
+            # Finde passende Analyse für diese Position
+            ticker_match = holding.ticker or holding.isin or holding.name
+            fundamental = next(
+                (fa for fa in analysis.get("fundamentalAnalysis", []) 
+                 if fa.get("ticker") == ticker_match),
+                None
+            )
+            technical = next(
+                (ta for ta in analysis.get("technicalAnalysis", [])
+                 if ta.get("ticker") == ticker_match),
+                None
+            )
+            
+            # Erstelle Analyse-Daten für Historie
+            analysis_data = {
+                "portfolioAnalysis": True,  # Marker für Portfolio-weite Analyse
+                "analysisDate": datetime.utcnow().isoformat()
+            }
+            
+            # Füge fundamentale Analyse hinzu, falls vorhanden
+            if fundamental:
+                analysis_data["fundamentalAnalysis"] = fundamental
+            else:
+                # Fallback: Erstelle minimale Analyse-Struktur
+                analysis_data["fundamentalAnalysis"] = {
+                    "ticker": ticker_match,
+                    "summary": "Keine detaillierte fundamentale Analyse verfügbar für diese Position.",
+                    "valuation": "fair"
+                }
+            
+            # Füge technische Analyse hinzu, falls vorhanden
+            if technical:
+                analysis_data["technicalAnalysis"] = technical
+            else:
+                # Fallback: Erstelle minimale Analyse-Struktur
+                analysis_data["technicalAnalysis"] = {
+                    "ticker": ticker_match,
+                    "trend": "neutral",
+                    "rsi": "N/A",
+                    "signal": "hold"
+                }
+            
+            # Füge Portfolio-weite Informationen hinzu
+            if analysis.get("risks"):
+                analysis_data["risks"] = analysis.get("risks")
+            if analysis.get("shortTermAdvice"):
+                analysis_data["shortTermAdvice"] = analysis.get("shortTermAdvice")
+            if analysis.get("longTermAdvice"):
+                analysis_data["longTermAdvice"] = analysis.get("longTermAdvice")
+            
             history_entry = AnalysisHistory(
                 userId=current_user.id,
                 portfolio_holding_id=holding.id,
@@ -196,21 +246,7 @@ async def analyze_portfolio_endpoint(
                 asset_name=holding.name,
                 asset_isin=holding.isin,
                 asset_ticker=holding.ticker,
-                analysis_data={
-                    # Extrahiere relevante Analyse für diese Position
-                    "fundamentalAnalysis": next(
-                        (fa for fa in analysis.get("fundamentalAnalysis", []) 
-                         if fa.get("ticker") == (holding.ticker or holding.isin or holding.name)),
-                        None
-                    ),
-                    "technicalAnalysis": next(
-                        (ta for ta in analysis.get("technicalAnalysis", [])
-                         if ta.get("ticker") == (holding.ticker or holding.isin or holding.name)),
-                        None
-                    ),
-                    "portfolioAnalysis": True,  # Marker für Portfolio-weite Analyse
-                    "analysisDate": datetime.utcnow().isoformat()
-                }
+                analysis_data=analysis_data
             )
             db.add(history_entry)
         

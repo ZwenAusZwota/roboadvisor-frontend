@@ -198,5 +198,37 @@
   color: #856404;
 }
 
+.history-no-data {
+  color: #999;
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+
+.history-list {
+  margin-top: 0.75rem;
+}
+
+.history-list ul {
+  margin: 0.5rem 0 0 1.5rem;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.history-list li {
+  margin: 0.25rem 0;
+  color: #666;
+}
+
+.history-risk-list {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  list-style-type: disc;
+}
+
+.history-risk-list li {
+  margin: 0.5rem 0;
+  color: #666;
+}
+
 
 
