@@ -144,3 +144,5 @@ logging.basicConfig(
 - Suche nach spezifischen Begriffen (z.B. "Registration failed")
 - Verwende Zeitstempel, um bestimmte Zeiträume zu untersuchen
 
+
+

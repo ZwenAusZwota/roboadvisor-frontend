@@ -169,3 +169,5 @@ curl -X GET http://localhost:8000/api/auth/me \
 3. **Token-Format**: `Bearer <token>` (mit Leerzeichen!)
 4. **Debugging**: Prüfe die Backend-Logs in DigitalOcean Dashboard
 
+
+

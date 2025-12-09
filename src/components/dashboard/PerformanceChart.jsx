@@ -70,3 +70,5 @@ const PerformanceChart = ({ data }) => {
 
 export default PerformanceChart
 
+
+

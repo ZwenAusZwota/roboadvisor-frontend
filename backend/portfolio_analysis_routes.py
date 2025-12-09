@@ -11,7 +11,7 @@ import logging
 from datetime import datetime
 
 from database import get_db
-from models import User, PortfolioHolding, UserSettings
+from models import User, PortfolioHolding, UserSettings, AnalysisHistory, AnalysisHistory
 from auth import get_current_user
 from services.openai_service import analyze_portfolio
 from services.cache_service import cache_service
@@ -187,6 +187,36 @@ async def analyze_portfolio_endpoint(
         logger.info(f"Starte AI-Analyse für User {current_user.id} mit {len(holdings_dict)} Positionen")
         analysis = await analyze_portfolio(holdings_dict, user_settings)
         
+        # Speichere Analyse-Historie für jede Portfolio-Position
+        for holding in holdings:
+            history_entry = AnalysisHistory(
+                userId=current_user.id,
+                portfolio_holding_id=holding.id,
+                watchlist_item_id=None,
+                asset_name=holding.name,
+                asset_isin=holding.isin,
+                asset_ticker=holding.ticker,
+                analysis_data={
+                    # Extrahiere relevante Analyse für diese Position
+                    "fundamentalAnalysis": next(
+                        (fa for fa in analysis.get("fundamentalAnalysis", []) 
+                         if fa.get("ticker") == (holding.ticker or holding.isin or holding.name)),
+                        None
+                    ),
+                    "technicalAnalysis": next(
+                        (ta for ta in analysis.get("technicalAnalysis", [])
+                         if ta.get("ticker") == (holding.ticker or holding.isin or holding.name)),
+                        None
+                    ),
+                    "portfolioAnalysis": True,  # Marker für Portfolio-weite Analyse
+                    "analysisDate": datetime.utcnow().isoformat()
+                }
+            )
+            db.add(history_entry)
+        
+        db.commit()
+        logger.info(f"Analyse-Historie für {len(holdings)} Positionen gespeichert")
+        
         # Speichere im Cache
         cache_service.set(current_user.id, analysis, request.portfolio_id)
         
@@ -230,4 +260,6 @@ async def clear_analysis_cache(
     """
     cache_service.invalidate(current_user.id)
     return {"message": "Cache erfolgreich gelöscht"}
+
+
 

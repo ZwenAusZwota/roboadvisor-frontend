@@ -60,7 +60,7 @@ def init_db():
         existing_tables = inspector.get_table_names()
         
         # Definiere alle erwarteten Tabellen
-        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings', 'portfolio_holdings']
+        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings', 'portfolio_holdings', 'watchlist_items', 'analysis_history']
         missing_tables = [table for table in expected_tables if table not in existing_tables]
         
         if missing_tables:

@@ -50,3 +50,5 @@ Argon2 verwendet standardmäßig sichere Parameter:
 
 Diese Parameter können bei Bedarf angepasst werden, sind aber für die meisten Anwendungen ausreichend.
 
+
+

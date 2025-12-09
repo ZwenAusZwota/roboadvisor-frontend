@@ -10,3 +10,5 @@ COMMENT 'Branche des Wertpapiers (z.B. Technologie, Finanzen, etc.)';
 -- ALTER TABLE portfolio_holdings 
 -- ADD COLUMN sector VARCHAR(100) NULL;
 
+
+

@@ -5,3 +5,5 @@
 ALTER TABLE portfolio_holdings 
 ALTER COLUMN quantity TYPE NUMERIC(15, 6) USING quantity::numeric(15, 6);
 
+
+

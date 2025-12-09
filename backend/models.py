@@ -17,6 +17,7 @@ class User(Base):
     securities = relationship("Security", back_populates="user", cascade="all, delete-orphan")
     settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
     portfolio_holdings = relationship("PortfolioHolding", back_populates="user", cascade="all, delete-orphan")
+    watchlist_items = relationship("WatchlistItem", back_populates="user", cascade="all, delete-orphan")
 
 class RiskProfile(Base):
     __tablename__ = "risk_profiles"
@@ -60,8 +61,9 @@ class PortfolioHolding(Base):
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     
-    # Relationship
+    # Relationships
     user = relationship("User", back_populates="portfolio_holdings")
+    analysis_history = relationship("AnalysisHistory", back_populates="portfolio_holding", cascade="all, delete-orphan")
 
 class TelegramUser(Base):
     __tablename__ = "telegram_users"
@@ -96,4 +98,51 @@ class UserSettings(Base):
     
     # Relationship
     user = relationship("User", back_populates="settings")
+
+
+class WatchlistItem(Base):
+    __tablename__ = "watchlist_items"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    userId = Column(Integer, ForeignKey("users.id"), nullable=False)
+    isin = Column(String(12), nullable=True)  # ISIN ist 12 Zeichen lang
+    ticker = Column(String(20), nullable=True)  # Ticker-Symbol
+    name = Column(String(255), nullable=False)  # Name des Wertpapiers
+    sector = Column(String(100), nullable=True)  # Branche (optional)
+    region = Column(String(100), nullable=True)  # Region (optional)
+    asset_class = Column(String(100), nullable=True)  # Assetklasse (optional)
+    notes = Column(Text, nullable=True)  # Notizen des Benutzers
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # Relationship
+    user = relationship("User", back_populates="watchlist_items")
+    analysis_history = relationship("AnalysisHistory", back_populates="watchlist_item", cascade="all, delete-orphan")
+
+
+class AnalysisHistory(Base):
+    __tablename__ = "analysis_history"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    userId = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Referenz auf Asset (entweder Portfolio-Holding oder Watchlist-Item)
+    portfolio_holding_id = Column(Integer, ForeignKey("portfolio_holdings.id"), nullable=True)
+    watchlist_item_id = Column(Integer, ForeignKey("watchlist_items.id"), nullable=True)
+    
+    # Asset-Informationen (für schnellen Zugriff ohne Join)
+    asset_name = Column(String(255), nullable=False)
+    asset_isin = Column(String(12), nullable=True)
+    asset_ticker = Column(String(20), nullable=True)
+    
+    # Analyse-Daten (als JSON gespeichert)
+    analysis_data = Column(JSON, nullable=False)  # Enthält: fundamentalAnalysis, technicalAnalysis, etc.
+    
+    # Metadaten
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    
+    # Relationships
+    user = relationship("User")
+    portfolio_holding = relationship("PortfolioHolding", back_populates="analysis_history")
+    watchlist_item = relationship("WatchlistItem", back_populates="analysis_history")
 

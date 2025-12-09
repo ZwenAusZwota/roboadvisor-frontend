@@ -242,3 +242,5 @@ Empfohlene Metriken:
 - [ ] E-Mail-Versand bei neuen Analysen
 - [ ] Backtesting von Empfehlungen
 
+
+

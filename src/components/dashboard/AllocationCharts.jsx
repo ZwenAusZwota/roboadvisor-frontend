@@ -81,3 +81,5 @@ const AllocationCharts = ({ allocation }) => {
 
 export default AllocationCharts
 
+
+

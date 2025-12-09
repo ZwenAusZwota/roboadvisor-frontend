@@ -1,0 +1,55 @@
+/* Watchlist Analysis Styles */
+.watchlist-analysis-container {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.watchlist-analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.watchlist-analysis-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.watchlist-analysis-error {
+  padding: 1rem;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  color: #721c24;
+  margin-bottom: 1rem;
+}
+
+.watchlist-analysis-loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.watchlist-analysis-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.watchlist-analysis-item {
+  background: white;
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.watchlist-analysis-item h4 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.125rem;
+}
+

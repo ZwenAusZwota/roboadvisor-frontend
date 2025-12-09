@@ -32,3 +32,5 @@ const AIAdviceShortLong = ({ shortTermAdvice, longTermAdvice }) => {
 
 export default AIAdviceShortLong
 
+
+

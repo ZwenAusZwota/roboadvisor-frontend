@@ -93,3 +93,5 @@ const AIRebalancingSuggestions = ({ diversification, suggestedRebalancing }) => 
 
 export default AIRebalancingSuggestions
 
+
+

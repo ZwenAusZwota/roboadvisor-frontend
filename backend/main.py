@@ -76,7 +76,7 @@ async def startup_event():
         from sqlalchemy import inspect
         inspector = inspect(engine)
         existing_tables = inspector.get_table_names()
-        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings', 'portfolio_holdings']
+        expected_tables = ['users', 'risk_profiles', 'securities', 'telegram_users', 'user_settings', 'portfolio_holdings', 'watchlist_items', 'analysis_history']
         missing_tables = [table for table in expected_tables if table not in existing_tables]
         
         if missing_tables:
@@ -291,6 +291,26 @@ app.include_router(analytics_router)
 # Portfolio analysis routes importieren und hinzufügen
 from portfolio_analysis_routes import router as portfolio_analysis_router
 app.include_router(portfolio_analysis_router)
+
+# Watchlist routes importieren und hinzufügen
+from watchlist_routes import router as watchlist_router
+app.include_router(watchlist_router)
+
+# Watchlist analysis routes importieren und hinzufügen
+from watchlist_analysis_routes import router as watchlist_analysis_router
+app.include_router(watchlist_analysis_router)
+
+# Analysis history routes importieren und hinzufügen
+from analysis_history_routes import router as analysis_history_router
+app.include_router(analysis_history_router)
+
+# Watchlist routes importieren und hinzufügen
+from watchlist_routes import router as watchlist_router
+app.include_router(watchlist_router)
+
+# Asset analysis routes importieren und hinzufügen
+from asset_analysis_routes import router as asset_analysis_router
+app.include_router(asset_analysis_router)
 
 if __name__ == "__main__":
     import uvicorn

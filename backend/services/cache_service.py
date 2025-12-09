@@ -114,3 +114,5 @@ class CacheService:
 # Globale Cache-Instanz
 cache_service = CacheService(ttl_hours=12)
 
+
+

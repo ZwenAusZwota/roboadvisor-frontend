@@ -132,6 +132,7 @@ const Header = () => {
                 {user && (
                   <>
                     <li><Link to="/portfolio" className="nav-link">Portfolio</Link></li>
+                    <li><Link to="/watchlist" className="nav-link">Watchlist</Link></li>
                     <li><Link to="/dashboard" className="nav-link">Dashboard</Link></li>
                   </>
                 )}

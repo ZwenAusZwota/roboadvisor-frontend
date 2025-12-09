@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import api from '../../services/api'
+import AnalysisHistoryModal from '../analysis/AnalysisHistoryModal'
 
 const PortfolioList = ({ refreshTrigger, showSuccess, showError, onRefresh }) => {
   const [holdings, setHoldings] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
+  const [selectedHolding, setSelectedHolding] = useState(null)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
 
   useEffect(() => {
     loadPortfolio()
@@ -85,7 +88,15 @@ const PortfolioList = ({ refreshTrigger, showSuccess, showError, onRefresh }) =>
           </thead>
           <tbody>
             {holdings.map((holding) => (
-              <tr key={holding.id}>
+              <tr 
+                key={holding.id}
+                className="portfolio-row-clickable"
+                onClick={() => {
+                  setSelectedHolding(holding)
+                  setShowHistoryModal(true)
+                }}
+                style={{ cursor: 'pointer' }}
+              >
                 <td>{holding.name}</td>
                 <td>{holding.isin || '-'}</td>
                 <td>{holding.ticker || '-'}</td>
@@ -95,7 +106,7 @@ const PortfolioList = ({ refreshTrigger, showSuccess, showError, onRefresh }) =>
                 <td>{formatDate(holding.purchase_date)}</td>
                 <td>{holding.quantity}</td>
                 <td>{holding.purchase_price}</td>
-                <td>
+                <td onClick={(e) => e.stopPropagation()}>
                   <button
                     className="btn-danger-small"
                     onClick={() => handleDelete(holding.id)}
@@ -108,6 +119,21 @@ const PortfolioList = ({ refreshTrigger, showSuccess, showError, onRefresh }) =>
           </tbody>
         </table>
       </div>
+
+      {showHistoryModal && selectedHolding && (
+        <AnalysisHistoryModal
+          isOpen={showHistoryModal}
+          onClose={() => {
+            setShowHistoryModal(false)
+            setSelectedHolding(null)
+          }}
+          type="portfolio"
+          itemId={selectedHolding.id}
+          assetName={selectedHolding.name}
+          assetIsin={selectedHolding.isin}
+          assetTicker={selectedHolding.ticker}
+        />
+      )}
     </div>
   )
 }

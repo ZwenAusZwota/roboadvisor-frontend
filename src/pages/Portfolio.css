@@ -68,6 +68,20 @@
   border-bottom-color: #667eea;
 }
 
+/* Clickable portfolio rows */
+.portfolio-row-clickable {
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.portfolio-row-clickable:hover {
+  background-color: #e7f3ff !important;
+}
+
+.holdings-table tbody tr.portfolio-row-clickable:hover {
+  background-color: #e7f3ff;
+}
+
 .portfolio-tab-content {
   min-height: 400px;
 }

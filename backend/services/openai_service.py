@@ -58,7 +58,7 @@ def get_openai_client():
         return None
 
 # Standard System Prompt für Portfolio-Analysen
-SYSTEM_PROMPT = """Du bist ein Finanzanalyse-Assistent für ein Portfolio-Management-Tool. 
+PORTFOLIO_SYSTEM_PROMPT = """Du bist ein Finanzanalyse-Assistent für ein Portfolio-Management-Tool. 
 Analysiere das Portfolio des Benutzers und gib strukturiertes JSON im folgenden Schema zurück:
 
 {
@@ -82,6 +82,33 @@ Analysiere das Portfolio des Benutzers und gib strukturiertes JSON im folgenden 
   "suggestedRebalancing": "",
   "shortTermAdvice": "",
   "longTermAdvice": ""
+}
+
+Passe alle Empfehlungen an den Anlagehorizont und das Risikoprofil des Benutzers an.
+Verwende klare, nicht-technische Sprache. Keine Disclaimer oder Finanzberatungswarnungen."""
+
+# System Prompt für einzelne Asset-Analysen
+SINGLE_ASSET_SYSTEM_PROMPT = """Du bist ein Finanzanalyse-Assistent für ein Portfolio-Management-Tool. 
+Analysiere ein einzelnes Wertpapier/Asset und gib strukturiertes JSON im folgenden Schema zurück:
+
+{
+  "fundamentalAnalysis": {
+    "summary": "",
+    "valuation": "fair/undervalued/overvalued",
+    "strengths": [],
+    "weaknesses": [],
+    "keyMetrics": {}
+  },
+  "technicalAnalysis": {
+    "trend": "",
+    "rsi": "",
+    "signal": "buy/hold/sell",
+    "supportLevel": "",
+    "resistanceLevel": ""
+  },
+  "risks": [],
+  "recommendation": "",
+  "priceTarget": ""
 }
 
 Passe alle Empfehlungen an den Anlagehorizont und das Risikoprofil des Benutzers an.
@@ -245,7 +272,7 @@ Berücksichtige dabei:
         response = client.chat.completions.create(
             model="gpt-4o-mini",  # Verwende gpt-4o-mini für Kostenoptimierung, kann auf gpt-4o geändert werden
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": PORTFOLIO_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
             temperature=0.7,
@@ -275,33 +302,159 @@ Berücksichtige dabei:
         raise
 
 
-def parse_percentage_string(value) -> float:
+async def analyze_single_asset(
+    asset: Dict,
+    user_settings: Optional[Dict] = None
+) -> Dict[str, Any]:
     """
-    Konvertiert einen Prozent-String (z.B. "70%" oder "14.9%") zu einem float (z.B. 70.0 oder 14.9)
+    Analysiert ein einzelnes Asset (Wertpapier) mit OpenAI GPT-4
     
     Args:
-        value: String mit Prozentzeichen oder bereits ein float/int
+        asset: Asset-Dictionary mit name, isin, ticker, etc.
+        user_settings: Benutzereinstellungen (riskProfile, investmentHorizon)
         
     Returns:
-        Float-Wert (ohne Prozentzeichen)
+        Strukturierte Analyse als Dictionary
     """
-    if isinstance(value, (int, float)):
-        return float(value)
+    client = get_openai_client()
+    if not client:
+        raise ValueError("OPENAI_API_KEY oder OPENAI_SECRET ist nicht gesetzt. Bitte konfigurieren Sie die OpenAI API in den Environment Variables.")
     
-    if isinstance(value, str):
-        # Entferne Prozentzeichen und Leerzeichen
-        cleaned = value.replace("%", "").strip()
+    try:
+        # Baue Asset-Kontext
+        asset_context_parts = [
+            f"Asset-Analyse für: {asset.get('name', 'Unbekannt')}",
+            f"ISIN: {asset.get('isin', 'N/A')}",
+            f"Ticker: {asset.get('ticker', 'N/A')}",
+            f"Branche: {asset.get('sector', 'Unbekannt')}",
+            f"Region: {asset.get('region', 'Unbekannt')}",
+            f"Assetklasse: {asset.get('asset_class', 'Unbekannt')}"
+        ]
+        
+        # Zusätzliche Infos für Portfolio-Holdings
+        if 'purchase_price' in asset:
+            asset_context_parts.append(f"Kaufpreis: {asset.get('purchase_price')} EUR")
+            asset_context_parts.append(f"Anzahl: {asset.get('quantity', 0)}")
+            asset_context_parts.append(f"Kaufdatum: {asset.get('purchase_date', 'N/A')}")
+        
+        asset_context = "\n".join(asset_context_parts)
+        
+        # Benutzereinstellungen
+        if user_settings:
+            risk_profile = user_settings.get('riskProfile', 'Nicht angegeben')
+            investment_horizon = user_settings.get('investmentHorizon', 'Nicht angegeben')
+            asset_context += f"\n\nBenutzereinstellungen:\nRisikoprofil: {risk_profile}\nAnlagehorizont: {investment_horizon}"
+        
+        # User Prompt
+        user_prompt = f"""Analysiere das folgende Wertpapier:
+
+{asset_context}
+
+Gib eine detaillierte Analyse im vorgegebenen JSON-Format zurück.
+Berücksichtige dabei:
+- Fundamentale Bewertung (Stärken, Schwächen, Bewertung)
+- Technische Analyse (Trend, RSI, Signale, Support/Resistance)
+- Risiken
+- Klare Kauf-/Verkauf-/Halte-Empfehlung
+- Preisziel (falls möglich)"""
+        
+        logger.info(f"Rufe OpenAI API auf für Asset-Analyse: {asset.get('name')}")
+        
+        # OpenAI API Call
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SINGLE_ASSET_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
+        )
+        
+        # Parse Response
+        content = response.choices[0].message.content
+        logger.info(f"OpenAI Response erhalten für Asset-Analyse: {len(content)} Zeichen")
+        
         try:
-            return float(cleaned)
-        except ValueError:
-            # Fallback: versuche nur Zahlen zu extrahieren
-            import re
-            numbers = re.findall(r'\d+\.?\d*', cleaned)
-            if numbers:
-                return float(numbers[0])
-            return 0.0
+            analysis = json.loads(content)
+        except json.JSONDecodeError as e:
+            logger.error(f"Fehler beim Parsen der OpenAI Response: {e}")
+            logger.error(f"Response Content: {content[:500]}")
+            raise ValueError(f"OpenAI Response konnte nicht als JSON geparst werden: {e}")
+        
+        # Validierung und Normalisierung
+        analysis = validate_and_normalize_single_asset_analysis(analysis, asset)
+        
+        logger.info("Asset-Analyse erfolgreich erstellt")
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Fehler bei OpenAI API Call für Asset-Analyse: {e}")
+        raise
+
+
+def validate_and_normalize_single_asset_analysis(analysis: Dict, asset: Dict) -> Dict:
+    """
+    Validiert und normalisiert die OpenAI-Analyse für ein einzelnes Asset
     
-    return 0.0
+    Args:
+        analysis: Rohe Analyse von OpenAI
+        asset: Asset-Dictionary
+        
+    Returns:
+        Validierte und normalisierte Analyse
+    """
+    normalized = {
+        "fundamentalAnalysis": {
+            "summary": "",
+            "valuation": "fair",
+            "strengths": [],
+            "weaknesses": [],
+            "keyMetrics": {}
+        },
+        "technicalAnalysis": {
+            "trend": "neutral",
+            "rsi": "N/A",
+            "signal": "hold",
+            "supportLevel": "",
+            "resistanceLevel": ""
+        },
+        "risks": [],
+        "recommendation": "",
+        "priceTarget": None
+    }
+    
+    # Fundamental Analysis
+    if "fundamentalAnalysis" in analysis and isinstance(analysis["fundamentalAnalysis"], dict):
+        fa = analysis["fundamentalAnalysis"]
+        normalized["fundamentalAnalysis"] = {
+            "summary": fa.get("summary", ""),
+            "valuation": fa.get("valuation", "fair"),
+            "strengths": fa.get("strengths", []) if isinstance(fa.get("strengths"), list) else [],
+            "weaknesses": fa.get("weaknesses", []) if isinstance(fa.get("weaknesses"), list) else [],
+            "keyMetrics": fa.get("keyMetrics", {}) if isinstance(fa.get("keyMetrics"), dict) else {}
+        }
+    
+    # Technical Analysis
+    if "technicalAnalysis" in analysis and isinstance(analysis["technicalAnalysis"], dict):
+        ta = analysis["technicalAnalysis"]
+        normalized["technicalAnalysis"] = {
+            "trend": ta.get("trend", "neutral"),
+            "rsi": str(ta.get("rsi", "N/A")),
+            "signal": ta.get("signal", "hold"),
+            "supportLevel": ta.get("supportLevel", ""),
+            "resistanceLevel": ta.get("resistanceLevel", "")
+        }
+    
+    # Risks
+    if "risks" in analysis and isinstance(analysis["risks"], list):
+        normalized["risks"] = analysis["risks"]
+    
+    # Recommendation & Price Target
+    normalized["recommendation"] = analysis.get("recommendation", "")
+    normalized["priceTarget"] = analysis.get("priceTarget")
+    
+    return normalized
 
 
 def parse_percentage_string(value) -> float:

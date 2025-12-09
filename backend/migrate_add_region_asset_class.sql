@@ -13,3 +13,5 @@ COMMENT 'Assetklasse des Wertpapiers (z.B. Aktien, Anleihen, etc.)';
 -- ADD COLUMN region VARCHAR(100) NULL,
 -- ADD COLUMN asset_class VARCHAR(100) NULL;
 
+
+

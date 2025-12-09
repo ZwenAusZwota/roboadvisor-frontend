@@ -347,6 +347,65 @@ class ApiService {
       method: 'DELETE',
     })
   }
+
+  // Watchlist Endpoints
+  async getWatchlist() {
+    return this.request('/api/watchlist')
+  }
+
+  async getWatchlistItem(id) {
+    return this.request(`/api/watchlist/${id}`)
+  }
+
+  async createWatchlistItem(item) {
+    return this.request('/api/watchlist', {
+      method: 'POST',
+      body: JSON.stringify(item),
+    })
+  }
+
+  async updateWatchlistItem(id, item) {
+    return this.request(`/api/watchlist/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(item),
+    })
+  }
+
+  async deleteWatchlistItem(id) {
+    return this.request(`/api/watchlist/${id}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async analyzeWatchlist(itemId = null, forceRefresh = false) {
+    return this.request('/api/watchlist/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        item_id: itemId,
+        force_refresh: forceRefresh 
+      }),
+    })
+  }
+
+  // Analysis History Endpoints
+  async getPortfolioHoldingHistory(holdingId) {
+    return this.request(`/api/analysis-history/portfolio/${holdingId}`)
+  }
+
+  async getWatchlistItemHistory(itemId) {
+    return this.request(`/api/analysis-history/watchlist/${itemId}`)
+  }
+
+  async getAssetHistory(isin = null, ticker = null) {
+    const params = new URLSearchParams()
+    if (isin) params.append('isin', isin)
+    if (ticker) params.append('ticker', ticker)
+    return this.request(`/api/analysis-history/asset?${params.toString()}`)
+  }
+
+  async getAnalysisSummary() {
+    return this.request('/api/analysis-history/summary')
+  }
 }
 
 export default new ApiService()
