@@ -1,0 +1,96 @@
+# Beispiel-Konfiguration für DigitalOcean App Platform
+# Füge dies zu deiner .do/app.yaml hinzu oder erstelle einen separaten Job-Service
+
+name: roboadvisor-app
+region: fra1
+
+services:
+  - name: backend
+    github:
+      repo: ZwenAusZwota/roboadvisor-frontend
+      branch: main
+      deploy_on_push: true
+    source_dir: backend
+    build_command: pip install -r requirements.txt
+    run_command: uvicorn main:app --host 0.0.0.0 --port 8080
+    environment_slug: python
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 8080
+    envs:
+      - key: SECRET_KEY
+        value: ${SECRET_KEY}
+        type: SECRET
+        scope: RUN_TIME
+      - key: DATABASE_URL
+        value: ${db-postgresql-fra1-80863.DATABASE_URL}
+        scope: RUN_TIME
+      - key: OPENAI_SECRET
+        value: ${OPENAI_SECRET}
+        scope: RUN_AND_BUILD_TIME
+
+# TÄGLICHER ANALYSE-JOB
+jobs:
+  - name: daily-analysis
+    github:
+      repo: ZwenAusZwota/roboadvisor-frontend
+      branch: main
+      deploy_on_push: true
+    run_command: python jobs/daily_analysis_job.py
+    source_dir: backend
+    environment_slug: python
+    instance_size_slug: basic-xxs
+    schedule:
+      cron: "0 2 * * *"  # Täglich um 2 Uhr UTC (3 Uhr MEZ im Winter, 4 Uhr MESZ im Sommer)
+    envs:
+      - key: DATABASE_URL
+        value: ${db-postgresql-fra1-80863.DATABASE_URL}
+        scope: RUN_TIME
+      - key: OPENAI_SECRET
+        value: ${OPENAI_SECRET}
+        scope: RUN_AND_BUILD_TIME
+      - key: SECRET_KEY
+        value: ${SECRET_KEY}
+        type: SECRET
+        scope: RUN_TIME
+
+databases:
+  - name: db-postgresql-fra1-80863
+    engine: PG
+    version: "18"
+    production: true
+    cluster_name: db-postgresql-fra1-80863
+
+static_sites:
+  - name: web
+    github:
+      repo: ZwenAusZwota/roboadvisor-frontend
+      branch: main
+      deploy_on_push: true
+    build_command: npm ci && npm run build
+    output_dir: dist
+    index_document: index.html
+    error_document: index.html
+
+ingress:
+  rules:
+    - match:
+        path:
+          prefix: /roboadvisor-frontend-backend
+        authority: {}
+      component:
+        name: backend
+    - match:
+        path:
+          prefix: /
+        authority: {}
+      component:
+        name: web
+    - match:
+        path:
+          prefix: /api
+        authority: {}
+      component:
+        name: web
+        rewrite: /roboadvisor-frontend-backend
+
